@@ -1,0 +1,45 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'HF_TOKEN=${_HF_TOKEN}'
+      - '-t'
+      - '${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/wellington-poller:${_TAG}'
+      - 'backend'
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/wellington-poller:${_TAG}'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'wellington-poller'
+      - '--image'
+      - '${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/wellington-poller:${_TAG}'
+      - '--region'
+      - '${_AR_REGION}'
+      - '--allow-unauthenticated'
+      # 16Gi/4 CPU — now loading TWO 2.3GB GGUFs (Clarifier + Triage
+      # Classifier) simultaneously, not one. 8Gi/4 CPU was already needed
+      # for a single model (4Gi OOM-killed it — silent crash, instant
+      # restart), so doubling memory for two in-process models loaded at
+      # once, keeping the same headroom-over-file-size ratio.
+      - '--memory'
+      - '16Gi'
+      - '--cpu'
+      - '4'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--timeout'
+      - '300'
+
+images:
+  - '${_AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/wellington-poller:${_TAG}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

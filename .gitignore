@@ -1,0 +1,28 @@
+# Model artifacts — large binaries from the fine-tuning pipeline (see
+# docs/BUILD_PLAN.md "Validated model build/deploy pipeline"). Fetched from
+# the private Hugging Face repo at Cloud Build time, not committed here.
+adapters/
+fused/
+gguf/
+backend/models/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+frontend/build/
+frontend/.vercel/
+
+# Env
+.env
+!.env.example
+
+# OS
+.DS_Store
+
+# Working-session backup files (e.g. *.pre-correction.bak from dataset edits)
+*.bak

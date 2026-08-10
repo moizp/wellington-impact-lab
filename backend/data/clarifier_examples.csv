@@ -1,0 +1,421 @@
+meta_call,report_text,question_output,answer,actions_output
+1_ask,Something's wrong near my house.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,There's smoke coming from the industrial park.,"About how much smoke, and can you see any flames? Is there anyone or houses nearby?",,
+1_ask,"Felt the ground shake for a few seconds around 3pm, nothing fell over, no damage that I can see.","Thanks for the detail — can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking?",,
+1_ask,Water,"Can you tell us more — where is the water, and what's happening exactly?",,
+1_ask,"Big crash sound outside, not sure what happened, no one's hurt as far as I can tell.",Can you please tell us what kind of crash it is and whether you can see any damage?,,
+1_ask,"Tree down on Karori Road blocking one lane, happened about ten minutes ago.","Thanks — is the tree blocking the whole road or just part of it, is anyone injured or is anything damaged by the tree?",,
+1_ask,Power's out.,"Can you tell us which street or suburb you're in, and whether it looks like just your place or a wider area?",,
+1_ask,"Strong smell of gas near the shops on Adelaide Road, been noticing it for the last 15 minutes, seems to be getting stronger.","Thanks for the detail — have you noticed anyone else reacting to the smell, or any visible source nearby?",,
+1_ask,Flooding,How deep is the water and is anyone in danger or vehicles damaged?,,
+1_ask,"My neighbour's fence blew down in the wind about half an hour ago, no one was hurt, just the fence.",Thanks for confirming no one was hurt — is the fence blocking any path or road?,,
+2_act,Something's wrong near my house.,Could you tell us more about what you're seeing or hearing?,"I can smell smoke but can't see where it's coming from, I'm on Riddiford Street.","monitor_situation, document_further"
+2_act,There's smoke coming from the industrial park.,"About how much smoke, and can you see any flames?","Quite a lot of dark smoke, no flames visible from here.",call_111
+2_act,"Felt the ground shake for a few seconds around 3pm, nothing fell over, no damage that I can see.",Can you confirm roughly how strong the shaking felt?,"Pretty mild, just a wobble, nothing fell or broke.",none
+2_act,Water,"Can you tell us more — where is the water, and what's happening exactly?","It's coming up through a drain on our street, ankle deep now and rising slowly.","monitor_situation, check_neighbours"
+2_act,"Big crash sound outside, not sure what happened, no one's hurt as far as I can tell.",Can you tell us roughly where the sound came from and whether you can see any damage?,"Sounded like it came from the driveway next door, I can't see anything from here.",check_neighbours
+2_act,"Tree down on Karori Road blocking one lane, happened about ten minutes ago.","Is the tree blocking the whole road or just part of it, and is anyone directing traffic?","Just one lane, cars are getting past slowly, no one's directing traffic.",document_further
+2_act,Power's out.,"Can you tell us which street or suburb you're in, and whether it looks like just your place or a wider area?","We're on Riddiford Street in Newtown, looks like the whole block is out.",monitor_situation
+2_act,"Strong smell of gas near the shops on Adelaide Road, been noticing it for the last 15 minutes, seems to be getting stronger.","Have you noticed anyone else reacting to the smell, or any visible source nearby?","A couple of people walked away from the shops holding their noses, can't see where it's coming from.","call_111, check_neighbours"
+2_act,Flooding,"Can you tell us where exactly, and roughly how deep the water is?","Outside our house on the main road, about knee deep and still rising.","call_111, evacuate"
+2_act,"My neighbour's fence blew down in the wind about half an hour ago, no one was hurt, just the fence.",Is the fence blocking any path or road?,"No, it's just fallen into their own yard, not blocking anything.",none
+1_ask,A tree's fallen across the road.,"Thanks — is the tree blocking the whole road or just part of it, is anyone injured or is anything damaged by the tree?",,
+1_ask,Gale-force gusts just came through.,Are the gusts causing any damage?,,
+1_ask,A car's rolled on the corner.,"Can you please let us know if the car is on fire, or if anyone is injured? Is it blocking traffic nearby?",,
+1_ask,There's a cracking sound from the hillside.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"Nonstop heavy rain in Titahi Bay, happened a little while ago.",Is the rain causing any flooding in your area?,,
+1_ask,A big pothole's appeared overnight.,Can you give us more details on the location of the pothole? Is the road still passable?,,
+1_ask,Someone's stuck on the cliff path.,Is the person injured or in life threatening danger?,,
+1_ask,A car's hit a power pole.,"Thanks — has the pole fallen down and injured anyone? Is the car is on fire, or if anyone is injured? Is it blocking traffic nearby?",,
+1_ask,Smells like burning plastic outside.,Can you give us a bit more detail — what's happening exactly? Can you see fire or smoke?,,
+1_ask,Just saw shifted ground near the retaining wall near our place in Paraparaumu.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,"A spreading damp patch on the ceiling in Masterton, happened a little while ago.",Can you tell us a bit more — is your ceiling in risk of falling down? Is anyone's affected?,,
+1_ask,Water's pooling on the road.,Is there any early signs of flooding as a result?,,
+1_ask,There's a multi-car crash outside.,How many cars are in the crash? Are they on fire? Is anyone injured?,,
+1_ask,Thick smoke's drifting through the street.,What color is the smoke? Has it spread across the whole street or only part of the street? Can you smell anything?,,
+1_ask,"A strong shake on our street in Strathmore, 20 minutes ago now. A couple of things fell off a shelf.","Thanks for the detail — can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?",,
+1_ask,Reporting a large new pothole in Highbury — first noticed it 20 minutes ago. One lane's still passable.,Can you give us more details on the location of the pothole? Is it making one lane not passable?,,
+1_ask,"A sharp jolt in Southgate, happened a little while ago.","Thanks for the detail — can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?",,
+1_ask,Reporting a sudden drop in water pressure in Featherston — first noticed it 20 minutes ago. No one seems to be working on it yet.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Noticed flooding spreading down the street around Seatoun this morning.,Thanks for that — how high is the flood and is anyone in danger? Is it getting worse?,,
+1_ask,Noticed a concerned group gathered nearby around Miramar this morning.,Do you know what is group is concerned about? Is there any anti-social behaviour?,,
+1_ask,Strong gas smell near the shops.,"Thanks for the detail — have you noticed anyone else reacting to the smell, or any visible source nearby?",,
+1_ask,Reporting water coming up in the carpark in Carterton.,Thanks for that — is it causing flood and is anyone in danger? Is any car damaged? Is it getting worse?,,
+1_ask,Water's coming up through a drain.,Thanks for that — is it causing flood and is anyone in danger? Is it getting worse?,,
+1_ask,That was a strong one.,Can you give us a bit more detail — what's happening exactly?,,
+1_ask,There's been a sulphur smell in the air in Vogeltown since about half an hour ago. Seems localised to one corner of the block.,"Thanks for the detail — have you noticed anyone else reacting to the smell, or any visible source nearby?",,
+1_ask,Reporting flooding spreading down the street in Upper Hutt — first noticed it an hour ago. It's rising steadily.,Thanks for that — how high is the flood and is anyone in danger? Is it getting worse?,,
+1_ask,"There's been water coming up through a drain near Oriental Bay, started about 45 minutes ago. A couple of letterboxes are half-submerged.",Thanks for that — is it causing flood and is anyone in danger? Is it getting worse?,,
+1_ask,"There's been a sparking transformer near Kapiti, started about 10 minutes ago. Neighbours confirm it's not just us.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"A burning smell with no flames visible in Waitangirua, happened a little while ago.","Thanks for the detail — have you noticed anyone else reacting to the smell, or any visible source nearby?",,
+1_ask,"Thick smoke drifting through the street in Cannons Creek, happened a little while ago.","About how much smoke, and can you see any flames? Is there anyone or houses nearby?",,
+1_ask,Reporting a car rolling on the corner in Wadestown.,"Can you please let us know if the car is on fire, or if anyone is injured? Is it blocking traffic nearby?",,
+1_ask,A large group's gathered looking concerned.,Do you know what is group is concerned about? Is there any anti-social behaviour?,,
+1_ask,Very strong gusts outside.,Are the gusts causing any damage?,,
+1_ask,Roof's rattling loudly in the wind.,Is the roof at risk of being lifted up and causing injuries?,,
+1_ask,Noticed the ground moving underfoot around Waikanae this morning.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Reporting a vehicle hitting a power pole in Kapiti — first noticed it 10 minutes ago. Traffic's backed up behind it.,"Thanks — has the pole fallen down and injured anyone? Is the car is on fire, or if anyone is injured? Is it blocking traffic nearby?",,
+1_ask,"Water coming up through a drain in Churton Park, happened a little while ago.",Thanks for that — is it causing flood and is anyone in danger? Is it getting worse?,,
+1_ask,Noticed a gentle tremor around Wainuiomata this morning.,"Thanks for the detail — can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking?",,
+1_ask,"There's been someone stuck on the cliff path near Paparangi, started about 10 minutes ago. Not sure how long they've been there.",Is the person injured or in life threatening danger?,,
+1_ask,Noticed a cracking sound from the hillside around Taita this morning.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,"The ground shaking on our street in Featherston, 45 minutes ago now. Still feels a bit unsteady.","Thanks for the detail — can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking?",,
+1_ask,Reporting a rolling motion that lasted a while in Ngaio.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Water's over the footpath now.,How deep is the water and is anyone in danger or vehicles damaged? Is it still rising? Do you know what is causing this?,,
+1_ask,"An odd smell, hard to place.","Thanks for the detail — have you noticed anyone else reacting to the smell, or any visible source nearby?",,
+1_ask,Water's rising in the gutter fast.,Is the water causing any flooding in your area?,,
+1_ask,"There's been torrential rain near Eastbourne, started about half an hour ago. Gutters can't keep up with it.",Is the rain causing any flooding in your area?,,
+1_ask,"There's a strange visible current near Berhampore, not sure how serious it is.",Is the current causing any flooding in your area? Do you know what is causing it?,,
+1_ask,"There's been a spreading damp patch on the ceiling near Mount Victoria, started about 20 minutes ago. Nothing else seems affected.",Can you tell us a bit more — is your ceiling in risk of falling down? ,,
+1_ask,"There's been a collapsed fence panel near Roseneath, started about half an hour ago. Doesn't look like it's spread further yet.",Is the fence blocking any path or road? Is anyone injured as a result of that?,,
+1_ask,"There's a sparking transformer near Grenada, not sure how serious it is.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"There's two cars colliding near Kilbirnie, not sure how serious it is.",Are they cars on fire? Is anyone injured?,,
+1_ask,There's flooding near the shops.,Thanks for that — how high is the flood and is anyone in danger? Is it getting worse?,,
+1_ask,Felt a tremor just now.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,Someone's collapsed near the shops.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,Reporting water rising fast in the gutter in Masterton.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,A slip's come down onto the road.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"The stream overflowing its banks on our street in Brooklyn, an hour ago now. A couple of letterboxes are half-submerged.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Just saw a car crash near our place in Tawa.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,The stream's overflowing.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,There's been water coming up in the carpark in Roseneath since about a few minutes ago. A couple of letterboxes are half-submerged.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"A slip that's come down onto the road in Southgate, happened a little while ago.","Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,There's been a motorbike accident in Linden since about an hour ago. Airbags look like they went off.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,A small slip's appeared on the bank.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Quite a jolt just then.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,Noticed a multi-car crash around Ngaio this morning.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Torrential rain right now.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Noticed a vehicle hitting a power pole around Grenada this morning.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Whole street's lost power.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,The road surface has buckled.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"There's been a car rolling on the corner near Johnsonville, started about 10 minutes ago. People are out of their cars, walking around.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"There's been a sudden jolt near Linden, started about 10 minutes ago. Neighbours felt it too.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,There's been gale-force gusts in Whitby since about an hour ago. Trampoline's blown into the neighbour's yard.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,There's been the ground moving underfoot in Aro Valley since about 45 minutes ago. Doesn't seem to have caused any damage.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Just saw a sulphur smell in the air near our place in Hataitai.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Just saw a strong shake near our place in Tawa.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"A small, so-far-contained fire on our street in Thorndon, 10 minutes ago now. Smoke seems to be getting thicker.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"There's the stream overflowing its banks near Island Bay, not sure how serious it is.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Reporting an elderly neighbour not answering all day in Ngaio.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Reporting wind strong enough to knock things over in Paraparaumu.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"Trees bending right over in the wind on our street in Crofton Downs, half an hour ago now. A few garden items have blown away.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Two cars have just collided.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Trees bending right over out there.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"A strong gas smell near the shops on our street in Eastbourne, 10 minutes ago now. Getting stronger the longer I'm out here.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Reporting trees bending right over in the wind in Waitangirua.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Wind's howling outside right now.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"Wind strong enough to knock things over on our street in Khandallah, 20 minutes ago now. Hard to walk in a straight line outside.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"There's been heavy rain that hasn't let up near Thorndon, started about half an hour ago. Gutters can't keep up with it.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Reporting a slip that's come down onto the road in Paparangi — first noticed it 45 minutes ago. No one's directing traffic yet.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Reporting roof tiles rattling loudly in the wind in Maupuia — first noticed it 20 minutes ago. Fence is creaking badly.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,"There's smoke rising from the reserve near Paraparaumu, not sure how serious it is.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"There's been a new crack across the driveway near Oriental Bay, started about an hour ago. Nothing else seems affected.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Flooding's spreading down our street.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Just saw someone collapsed near the shops near our place in Wadestown.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Just saw a whole-street power outage near our place in Tawa.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"Two shakes close together on our street in Highbury, a few minutes ago now. Neighbours felt it too.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"A chemical smell coming from the industrial area in Naenae, happened a little while ago.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,There's been a slip blocking part of the walking track in Avalon since about 20 minutes ago. Been raining heavily beforehand.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"A sudden drop in water pressure in Kilbirnie, happened a little while ago.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Nonstop heavy rain out there.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,Reporting a gentle tremor in Lyall Bay — first noticed it an hour ago. Still feels a bit unsteady.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"There's been a small slip on the bank behind the house near Crofton Downs, started about 10 minutes ago. Been raining heavily beforehand.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,A crash just happened outside.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"A rolling motion that lasted a while on our street in Lower Hutt, half an hour ago now. Power flickered during it.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Water level at the wharf looks off.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"There's been an unusual, hard-to-place smell in Redwood since about 20 minutes ago. Getting stronger the longer I'm out here.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Reporting water over the footpath in Glenside — first noticed it 20 minutes ago. Kids usually walk that route to school.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"There's a small fire, contained so far.","Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"There's an unusual, hard-to-place smell near Titahi Bay, not sure how serious it is.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"There's been a cracked chimney near Brooklyn, started about a few minutes ago. Been keeping an eye on it since I noticed.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"There's gale-force gusts near Taita, not sure how serious it is.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Wind's really picked up.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"A retaining wall that looks like it's leaning in Plimmerton, happened a little while ago.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Reporting two cars colliding in Featherston — first noticed it an hour ago. Traffic's backed up behind it.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Windows rattled just now.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,New crack across the driveway.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"There's a block-wide power outage near Seatoun, not sure how serious it is.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"There's someone stuck on the cliff path near Southgate, not sure how serious it is.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Something's smouldering nearby.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"Smoke coming from a neighbouring property in Rongotai, happened a little while ago.","Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,There's been an elderly neighbour not answering all day in Lower Hutt since about 20 minutes ago. Can't tell exactly what's going on from here.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Just saw wind howling through the street near our place in Cannons Creek.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,There's been an odd water level at the wharf in Maupuia since about half an hour ago. Seems to be changing quickly.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Heaviest rain I've seen in a while.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,There's a chemical smell in the air.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,Chimney's cracked near the top.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,There's been a multi-car crash in Lower Hutt since about a few minutes ago. Can't tell if anyone's hurt from here.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Everything shook for a second.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Ceiling's got a spreading damp patch.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Reporting thick smoke drifting through the street in Avalon — first noticed it an hour ago. Smoke seems to be getting thicker.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"A power line down across the road on our street in Linden, an hour ago now. Been out for a little while now.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"There's a cracked chimney near Island Bay, not sure how serious it is.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"A concerned group gathered nearby on our street in Highbury, 20 minutes ago now. A small crowd's formed around them.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Noticed water over the footpath around Plimmerton this morning.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Rain's really hammering down.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Something just shook the house.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,A power line's down across the road.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,There's been debris partially blocking the road in Lyall Bay since about 45 minutes ago. Debris covers about half the road.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Reporting debris partially blocking the road in Wainuiomata.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Noticed a small slip on the bank behind the house around Waitangirua this morning.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Smoke's rising from the reserve.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"Flooding near the local shops on our street in Stokes Valley, 20 minutes ago now. A couple of letterboxes are half-submerged.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,"There's been shifted ground near the retaining wall near Khandallah, started about an hour ago. No rocks have actually come down yet.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Reporting torrential rain in Owhiro Bay.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,"Creaking during a shake in Petone, happened a little while ago.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Reporting water pooling on the road in Karori — first noticed it 45 minutes ago. Cars are still able to get through slowly.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,Noticed a sinkhole on the road around Berhampore this morning.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,House just swayed a lot.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,A sinkhole's opened up.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,The ground just shook.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,There's been someone collapsed near the shops in Johnsonville since about 45 minutes ago. Can't tell exactly what's going on from here.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"Much bigger waves than normal on our street in Aro Valley, half an hour ago now. Seems to be changing quickly.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"Water rising fast in the gutter on our street in Mount Victoria, a few minutes ago now. It's rising steadily.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"There's been rain heavier than usual near Vogeltown, started about 20 minutes ago. Gutters can't keep up with it.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Water's coming up in the carpark.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,A slip's blocked part of the walking track.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,Sulphur smell in the air.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,The wall's bulging at the base.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,There's been wind howling through the street in Avalon since about 10 minutes ago. Fence is creaking badly.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,"A smell like burning plastic in Newtown, happened a little while ago.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Reporting a cracking sound from the hillside in Whitby — first noticed it a few minutes ago. It's above a few houses.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"Flooding near the local shops in Elsdon, happened a little while ago.","Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,"There's been buckled road surface near Aro Valley, started about an hour ago. Debris covers about half the road.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Reporting a retaining wall that looks like it's leaning in Glenside — first noticed it 45 minutes ago. It's on the side facing the street.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"A motorbike accident in Newlands, happened a little while ago.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Smoke's coming from next door.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,The road's partially blocked by debris.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,Reporting rain coming down very hard in Melling — first noticed it a few minutes ago. Driveway's starting to pool.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Just saw heavy rain that hasn't let up near our place in Porirua.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Rain hasn't let up for ages.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,Waves are much bigger than normal.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,"There's two shakes close together near Miramar, not sure how serious it is.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Just saw rain heavier than usual near our place in Hataitai.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Reporting buckled road surface in Waikanae.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Just saw windows rattling from a shake near our place in Wadestown.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Reporting a strange visible current in Otaki — first noticed it half an hour ago. Never seen it like this before.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,The retaining wall looks like it's leaning.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,There's been a sharp jolt in Paparangi since about a few minutes ago. Doesn't seem to have caused any damage.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,There's been something smouldering nearby in Whitby since about 45 minutes ago. Smoke seems to be getting thicker.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,There's been smoke coming from a neighbouring property in Maupuia since about 10 minutes ago. No flames visible from here yet.,Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,There's been windows rattling from a shake in Johnsonville since about 10 minutes ago. Nothing fell that I can see.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,"There's been a tree fallen across the road near Greytown, started about a few minutes ago. No one's directing traffic yet.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,Felt a strong shake just now.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,"Water pooling on the road in Newtown, happened a little while ago.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Reporting a sinkhole on the road in Otaki — first noticed it an hour ago. One lane's still passable.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"There's been nonstop heavy rain near Redwood, started about 10 minutes ago. Neighbour's yard is flooding a bit.",That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,There's been someone shouting for help in Greytown since about 45 minutes ago. Not sure how long they've been there.,Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,Just saw something smouldering nearby near our place in Taita.,"Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,The transformer's sparking on the pole.,"Can you give us a bit more detail — what's happening exactly, and which suburb are you in?",,
+1_ask,There's been an unusually low tide in Lyall Bay since about 20 minutes ago. Never seen it like this before.,That's really helpful — one more thing: has it changed or gotten worse since you first noticed it?,,
+1_ask,The ground's shifted near the retaining wall.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,Felt two quick shakes.,"Could you tell us more about what you're seeing or hearing, and roughly where you are?",,
+1_ask,"Just saw a small, so-far-contained fire near our place in Porirua.","Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,Just saw a tree fallen across the road near our place in Petone.,"Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,There's been a motorbike accident.,"Thanks for flagging this — can you describe what's happening a bit more, and your rough location?",,
+1_ask,"There's been creaking during a shake near Greytown, started about an hour ago. Nothing fell that I can see.",Thanks for the detail — can you confirm whether anyone's been hurt or if there's any visible damage?,,
+1_ask,"There's been a car crash near Strathmore, started about an hour ago. Can't tell if anyone's hurt from here.",Thanks for confirming the timing — can you tell us if anyone else nearby seems to be reacting to it too?,,
+1_ask,"A wall bulging at the base in Elsdon, happened a little while ago.","Thanks — is this still ongoing, and can you describe it a bit further?",,
+1_ask,Reporting very strong wind gusts in Berhampore.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+1_ask,"The house swaying in Grenada, happened a little while ago.","Thanks for that — roughly when did this start, and does it seem to be getting worse?",,
+1_ask,Just saw a sudden jolt near our place in Newlands.,"Can you tell us a bit more about the scale of it, and whether anyone's affected?",,
+2_act,A large new pothole on our street in Greytown.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,There's a sudden drop in water pressure near Aro Valley.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,There's a whole-street power outage near Oriental Bay.,"Is this affecting just your place, or a wider area?","The whole block's out, neighbours have confirmed it too.","monitor_situation, check_neighbours"
+2_act,Just noticed water over the footpath around Kapiti.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,A sudden jolt on our street in Churton Park.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,There's a strong shake near Miramar.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,There's the house swaying near Wainuiomata.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Just noticed a sharp jolt around Wadestown.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Buckled road surface on our street in Naenae.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,Just noticed a cracking sound from the hillside around Lower Hutt.,"Has anything actually come down, or is it just early signs so far?",A large section has given way and it's still moving.,"call_111, evacuate"
+2_act,There's a car crash near Cannons Creek.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,An elderly neighbour not answering all day on our street in Owhiro Bay.,Do you know if anyone's been able to check on them directly yet?,"Not yet, but they usually answer, so it's just unusual.",check_neighbours
+2_act,Just noticed two cars colliding around Whitby.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,There's a power line down across the road near Melling.,"Is this affecting just your place, or a wider area?","The whole block's out, neighbours have confirmed it too.","monitor_situation, check_neighbours"
+2_act,Just noticed a tree fallen across the road around Oriental Bay.,"Is the road still passable, or is it fully blocked?","Still passable, cars are just going around it carefully.",document_further
+2_act,Reporting roof tiles rattling loudly in the wind in Plimmerton.,"Has anything actually been damaged, or is it just noisy so far?",Part of next door's roof has come off and debris is blowing across the road.,"call_111, check_neighbours"
+2_act,There's a smell like burning plastic near Brooklyn.,"Is the smell strong, and has anyone else nearby reacted to it?","Fairly mild, no one else seems to have noticed.",none
+2_act,There's a smell like burning plastic near Khandallah.,"Is the smell strong, and has anyone else nearby reacted to it?","Fairly mild, no one else seems to have noticed.",none
+2_act,Just noticed water coming up in the carpark around Porirua.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,Just noticed a cracking sound from the hillside around Johnsonville.,"Has anything actually come down, or is it just early signs so far?",A bit of soil and small rocks have come down already.,"monitor_situation, document_further"
+2_act,Much bigger waves than normal on our street in Khandallah.,"Has this happened before that you know of, or is it new?","Not that I've seen before, but nothing else seems unusual.",monitor_situation
+2_act,There's two shakes close together near Masterton.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?",Very strong — a shelf came down and there's a new crack across the wall.,"call_111, document_further"
+2_act,There's two shakes close together near Porirua.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?",Very strong — a shelf came down and there's a new crack across the wall.,"call_111, document_further"
+2_act,Just noticed an unusually low tide around Wadestown.,"Has this happened before that you know of, or is it new?","Not that I've seen before, but nothing else seems unusual.",monitor_situation
+2_act,Reporting the ground shaking in Hataitai.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,There's water pooling on the road near Hataitai.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Only a centimetre or two, doesn't seem to be rising anymore.",none
+2_act,Just noticed a collapsed fence panel around Johnsonville.,"Is it just cosmetic, or does it look like it might be structural?","Seems to be spreading a bit, worth keeping an eye on.","monitor_situation, document_further"
+2_act,Just noticed very strong wind gusts around Otaki.,"Has anything actually been damaged, or is it just noisy so far?","Just noisy so far, nothing damaged that I can see.",none
+2_act,There's smoke coming from a neighbouring property near Paparangi.,"Can you see any actual flames, or is it just smoke/smell so far?",No flames yet but the smoke's definitely getting thicker.,"call_111, check_neighbours"
+2_act,Just noticed a whole-street power outage around Berhampore.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,Reporting an odd water level at the wharf in Roseneath.,"Has this happened before that you know of, or is it new?","Not that I've seen before, but nothing else seems unusual.",monitor_situation
+2_act,Just noticed a concerned group gathered nearby around Paraparaumu.,Do you know if anyone's been able to check on them directly yet?,Someone's with them now and they don't look well at all.,call_111
+2_act,Reporting water pooling on the road in Melling.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Only a centimetre or two, doesn't seem to be rising anymore.",none
+2_act,Reporting gale-force gusts in Linden.,"Has anything actually been damaged, or is it just noisy so far?",A few garden items have blown away and the fence is creaking badly.,"monitor_situation, document_further"
+2_act,There's a strong shake near Petone.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Just noticed buckled road surface around Berhampore.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,Reporting a wall bulging at the base in Lower Hutt.,"Is it just cosmetic, or does it look like it might be structural?","Looks serious, part of the wall is visibly out of alignment now.","call_111, evacuate"
+2_act,A slip that's come down onto the road on our street in Glenside.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,There's a sparking transformer near Hataitai.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,Reporting trees bending right over in the wind in Lower Hutt.,"Has anything actually been damaged, or is it just noisy so far?",A few garden items have blown away and the fence is creaking badly.,"monitor_situation, document_further"
+2_act,There's a slip blocking part of the walking track near Stokes Valley.,"Has anything actually come down, or is it just early signs so far?","Just early signs, nothing's actually come down yet.",monitor_situation
+2_act,Nonstop heavy rain on our street in Upper Hutt.,"Is the rain causing any pooling or flooding near you, or just heavy?",Water's coming into the garage now and rising quickly.,"call_111, monitor_situation"
+2_act,Reporting heavy rain that hasn't let up in Stokes Valley.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,Just noticed a multi-car crash around Seatoun.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Doesn't look like anyone's hurt, just some vehicle damage, people are out and talking.",document_further
+2_act,Reporting two cars colliding in Khandallah.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,There's a new crack across the driveway near Plimmerton.,"Is it just cosmetic, or does it look like it might be structural?","Seems to be spreading a bit, worth keeping an eye on.","monitor_situation, document_further"
+2_act,There's gale-force gusts near Maupuia.,"Has anything actually been damaged, or is it just noisy so far?",Part of next door's roof has come off and debris is blowing across the road.,"call_111, check_neighbours"
+2_act,Reporting smoke coming from a neighbouring property in Miramar.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,There's smoke rising from the reserve near Upper Hutt.,"Can you see any actual flames, or is it just smoke/smell so far?","Yes, I can see flames now, and it looks like it's spreading.","call_111, evacuate"
+2_act,There's a chemical smell coming from the industrial area near Carterton.,"Is the smell strong, and has anyone else nearby reacted to it?","Fairly mild, no one else seems to have noticed.",none
+2_act,Just noticed a vehicle hitting a power pole around Karori.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,Just noticed a tree fallen across the road around Stokes Valley.,"Is the road still passable, or is it fully blocked?","Completely blocked, no way through at all right now.",call_111
+2_act,Just noticed a sparking transformer around Newlands.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,Two shakes close together on our street in Taita.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Trees bending right over in the wind on our street in Newtown.,"Has anything actually been damaged, or is it just noisy so far?",A few garden items have blown away and the fence is creaking badly.,"monitor_situation, document_further"
+2_act,There's a car crash near Eastbourne.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Doesn't look like anyone's hurt, just some vehicle damage, people are out and talking.",document_further
+2_act,Reporting a tree fallen across the road in Maupuia.,"Is the road still passable, or is it fully blocked?","Completely blocked, no way through at all right now.",call_111
+2_act,Just noticed water rising fast in the gutter around Titahi Bay.,"Can you tell us roughly how deep the water is, and whether it's still rising?",Knee-deep outside our house now and rising fast.,"call_111, evacuate"
+2_act,Just noticed rain coming down very hard around Naenae.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,Just noticed much bigger waves than normal around Island Bay.,"Has this happened before that you know of, or is it new?","Never seen anything like it, and people are still out on the beach.","call_111, evacuate"
+2_act,Just noticed the ground shaking around Newlands.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Fairly strong — a couple of things fell off a shelf, nothing major broken.","monitor_situation, document_further"
+2_act,Just noticed a block-wide power outage around Redwood.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,Reporting something smouldering nearby in Lyall Bay.,"Can you see any actual flames, or is it just smoke/smell so far?",No flames yet but the smoke's definitely getting thicker.,"call_111, check_neighbours"
+2_act,Reporting a rolling motion in Rongotai.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Fairly strong — a couple of things fell off a shelf, nothing major broken.","monitor_situation, document_further"
+2_act,There's a strong gas smell near the shops near Masterton.,"Is the smell strong, and has anyone else nearby reacted to it?","Fairly mild, no one else seems to have noticed.",none
+2_act,Just noticed thick smoke drifting through the street around Titahi Bay.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,Reporting a retaining wall that looks like it's leaning in Greytown.,"Is it just cosmetic, or does it look like it might be structural?","Looks pretty minor and cosmetic, not affecting anything else.",none
+2_act,Just noticed a block-wide power outage around Stokes Valley.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,Reporting very strong wind gusts in Ngaio.,"Has anything actually been damaged, or is it just noisy so far?","Just noisy so far, nothing damaged that I can see.",none
+2_act,"An unusual, hard-to-place smell on our street in Cannons Creek.","Is the smell strong, and has anyone else nearby reacted to it?","Quite strong, a couple of people walked away holding their noses.","call_111, check_neighbours"
+2_act,Just noticed water coming up in the carpark around Taita.,"Can you tell us roughly how deep the water is, and whether it's still rising?",Knee-deep outside our house now and rising fast.,"call_111, evacuate"
+2_act,Reporting a rolling motion in Vogeltown.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,There's torrential rain near Redwood.,"Is the rain causing any pooling or flooding near you, or just heavy?",Starting to pool in the driveway and gutters can't keep up.,monitor_situation
+2_act,Reporting much bigger waves than normal in Whitby.,"Has this happened before that you know of, or is it new?","First time I've seen it like this, seems to be changing quickly.","call_111, monitor_situation"
+2_act,There's water over the footpath near Waikanae.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,Reporting a block-wide power outage in Highbury.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,There's water pooling on the road near Newlands.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,There's wind howling through the street near Greytown.,"Has anything actually been damaged, or is it just noisy so far?","Just noisy so far, nothing damaged that I can see.",none
+2_act,Just noticed a burning smell with no flames visible around Hataitai.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,Reporting a sharp jolt in Carterton.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Reporting a rolling motion in Titahi Bay.,"Can you confirm roughly how strong the shaking felt, and whether anything's fallen or broken?","Fairly strong — a couple of things fell off a shelf, nothing major broken.","monitor_situation, document_further"
+2_act,There's rain coming down very hard near Elsdon.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,Just noticed heavy rain that hasn't let up around Southgate.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,There's a sudden drop in water pressure near Petone.,"Is this affecting just your place, or a wider area?","The whole block's out, neighbours have confirmed it too.","monitor_situation, check_neighbours"
+2_act,A sparking transformer on our street in Strathmore.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,Just noticed a strange visible current around Kilbirnie.,"Has this happened before that you know of, or is it new?","First time I've seen it like this, seems to be changing quickly.","call_111, monitor_situation"
+2_act,Reporting someone stuck on the cliff path in Masterton.,Do you know if anyone's been able to check on them directly yet?,Someone's with them now and they don't look well at all.,call_111
+2_act,There's a slip blocking part of the walking track near Oriental Bay.,"Has anything actually come down, or is it just early signs so far?","Just early signs, nothing's actually come down yet.",monitor_situation
+2_act,Just noticed someone stuck on the cliff path around Porirua.,Do you know if anyone's been able to check on them directly yet?,"Not yet, but they usually answer, so it's just unusual.",check_neighbours
+2_act,Reporting an elderly neighbour not answering all day in Wainuiomata.,Do you know if anyone's been able to check on them directly yet?,Someone's with them now and they don't look well at all.,call_111
+2_act,A whole-street power outage on our street in Elsdon.,When did the power go out? ,About 10 minutes ago. My neighbours also lost power. ,"monitor_situation, check_neighbours"
+2_act,An unusually low tide on our street in Eastbourne.,"Have you heard any unusual sounds coming from the sea, or felt any ground shaking? ",I felt the ground shake for about a minute,"call_111, evacuate"
+2_act,There's debris partially blocking the road near Highbury.,"Is the road still passable, or is it fully blocked?","Still passable, cars are just going around it carefully.",document_further
+2_act,Debris partially blocking the road on our street in Redwood.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,There's trees bending right over in the wind near Island Bay.,"Has anything actually been damaged, or is it just noisy so far?",Part of next door's roof has come off and debris is blowing across the road.,"call_111, check_neighbours"
+2_act,Reporting nonstop heavy rain in Aro Valley.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,There's power out around Crofton Downs.,"Is this affecting just your place, or a wider area?","Looks like just our place, neighbours still have power.",document_further
+2_act,There's a strange visible current near Ngaio.,"Have you heard any unusual sounds coming from the sea, or felt any ground shaking? ","No, nothing else seems unusual.",monitor_situation
+2_act,A gentle tremor on our street in Cannons Creek.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,A sudden jolt on our street in Owhiro Bay.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Fairly strong — a couple of things fell off a shelf, nothing major broken.","monitor_situation, document_further"
+2_act,A smell like burning plastic on our street in Island Bay.,"How strong is the smell, and are you feeling dizzy or lightheaded?","Fairly mild, I feel okay and no one else seems to have noticed.",none
+2_act,Just noticed two cars colliding around Island Bay.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,There's debris partially blocking the road near Crofton Downs.,"Is the road still passable, or is it fully blocked?","Still passable, cars are just going around it carefully.",document_further
+2_act,Just noticed something smouldering nearby around Avalon.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,Reporting much bigger waves than normal in Brooklyn.,"Have you heard any unusual sounds coming from the sea, or felt any ground shaking? ","First time I've seen it like this, seems to be changing quickly. It's windy but no other sounds. ","call_111, monitor_situation"
+2_act,Reporting a burning smell with no flames visible in Aro Valley.,"Can you see any actual flames, or is it just smoke/smell so far?",No flames yet but the smoke's definitely getting thicker.,"call_111, check_neighbours"
+2_act,A strong gas smell near the shops on our street in Porirua.,"How strong is the smell, and are you feeling dizzy or lightheaded?","Very strong, people are leaving the area and someone said they feel dizzy.","call_111, evacuate"
+2_act,There's the ground shaking near Strathmore.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Just noticed torrential rain around Johnsonville.,"Is the rain causing any pooling or flooding near you, or just heavy?",Starting to pool in the driveway and gutters can't keep up.,monitor_situation
+2_act,Just noticed a new crack across the driveway around Roseneath.,"Is it just cosmetic, or does it look like it might be structural?","Looks serious, part of the wall is visibly out of alignment now.","call_111, evacuate"
+2_act,A spreading damp patch on the ceiling on our street in Linden.,"Is it just cosmetic, or does it look like it might be structural?","Seems to be spreading a bit, worth keeping an eye on.","monitor_situation, document_further"
+2_act,Reporting shifted ground near the retaining wall in Grenada.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ",A large section has given way and it's still moving.,"call_111, evacuate"
+2_act,Just noticed windows rattling from a shake around Waikanae.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,There's water coming up in the carpark near Masterton.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Only a centimetre or two, doesn't seem to be rising anymore.",none
+2_act,Just noticed a sudden drop in water pressure around Southgate.,"Is this affecting just your place, or a wider area?",Whole street's out and there's a downed line sparking on the road.,"call_111, evacuate"
+2_act,Just noticed flooding near the local shops around Avalon.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Only a centimetre or two, doesn't seem to be rising anymore.",none
+2_act,There's roof tiles rattling loudly in the wind near Brooklyn.,"Has anything actually been damaged, or is it just noisy so far?",A few garden items have blown away and the fence is creaking badly.,"monitor_situation, document_further"
+2_act,Just noticed a strong gas smell near the shops around Taita.,"How strong is the smell, and are you feeling dizzy or lightheaded?","Fairly mild, i feel ok.","monitor_situation, document_further"
+2_act,There's the ground shaking near Aro Valley.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Fairly strong — a couple of things fell off a shelf, nothing major broken.","monitor_situation, document_further"
+2_act,A strong shake on our street in Melling.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Reporting roof tiles rattling loudly in the wind in Karori.,"Has anything actually been damaged, or is it just noisy so far?",Part of next door's roof has come off and debris is blowing across the road.,"call_111, check_neighbours"
+2_act,Reporting a motorbike accident in Otaki.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,Someone collapsed near the shops on our street in Vogeltown.,Do you know if anyone's been able to check on them directly yet?,Someone's with them now and they don't look well at all.,call_111
+2_act,Reporting a strange visible current in Otaki.,"Have you heard any unusual sounds coming from the sea, or felt any ground shaking? ",No,monitor_situation
+2_act,Just noticed roof tiles rattling loudly in the wind around Roseneath.,"Has anything actually been damaged, or is it just noisy so far?","Just noisy so far, nothing damaged that I can see.",none
+2_act,There's buckled road surface near Elsdon.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,A small slip on the bank behind the house on our street in Maupuia.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ","Just early signs, nothing's actually come down yet.",monitor_situation
+2_act,Just noticed an elderly neighbour not answering all day around Lyall Bay.,Do you know if anyone's been able to check on them directly yet?,"Not yet, but they usually answer, so it's just unusual.",check_neighbours
+2_act,Smoke coming from a neighbouring property on our street in Melling.,"Can you see any actual flames, or is it just smoke/smell so far?",No flames yet but the smoke's definitely getting thicker.,"call_111, check_neighbours"
+2_act,Flooding near the local shops on our street in Wainuiomata.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,There's a motorbike accident near Ngaio.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Doesn't look like anyone's hurt, just some vehicle damage, people are out and talking.",document_further
+2_act,There's water over the footpath near Waitangirua.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Only a centimetre or two, doesn't seem to be rising anymore.",none
+2_act,A retaining wall that looks like it's leaning on our street in Featherston.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ","Looks serious, part of the wall is visibly out of alignment now.","call_111, evacuate"
+2_act,Reporting flooding near the local shops in Lyall Bay.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,There's a large new pothole near Grenada.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,A chemical smell coming from the industrial area on our street in Waitangirua.,"How strong is the smell, and are you feeling dizzy or lightheaded?","Quite strong, i feel lightheaded. ","call_111, check_neighbours"
+2_act,There's a slip that's come down onto the road near Johnsonville.,"Is the road still passable, or is it fully blocked?","Completely blocked, no way through at all right now.",call_111
+2_act,Just noticed the house swaying around Avalon.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Just noticed a wall bulging at the base around Kilbirnie.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ",There are falling rocks and tipped trees,"call_111, evacuate"
+2_act,A burning smell with no flames visible on our street in Strathmore.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,Just noticed gale-force gusts around Mount Victoria.,"Has anything actually been damaged, or is it just noisy so far?",A few garden items have blown away and the fence is creaking badly.,"monitor_situation, document_further"
+2_act,Reporting a concerned group gathered nearby in Waikanae.,Do you know if anyone's been able to check on them directly yet?,Someone's with them now and they don't look well at all.,call_111
+2_act,A chemical smell coming from the industrial area on our street in Wadestown.,"How strong is the smell, and are you feeling dizzy or lightheaded?","Quite strong, a couple of people walked away holding their noses, but I feel okay. ","monitor_situation, check_neighbours"
+2_act,There's a small slip on the bank behind the house near Newtown.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ",There are no other signs. It's not raining anymore.,monitor_situation
+2_act,Reporting a vehicle hitting a power pole in Plimmerton.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,Just noticed a sudden jolt around Paraparaumu.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Reporting a spreading damp patch on the ceiling in Otaki.,"Is it just cosmetic, or does it look like it might be structural?","Looks serious, part of the wall is visibly out of alignment now.","call_111, evacuate"
+2_act,Reporting a sudden drop in water pressure in Upper Hutt.,"Is this affecting just your place, or a wider area?",Whole street's out and there's a downed line sparking on the road.,"call_111, evacuate"
+2_act,Reporting a retaining wall that looks like it's leaning in Grenada.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ",It is raining and water is coming out of the retaining wall. ,"call_111, evacuate"
+2_act,A wall bulging at the base on our street in Seatoun.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ","Seems to be spreading a bit, worth keeping an eye on.","monitor_situation, document_further"
+2_act,A power line down across the road on our street in Paparangi.,Are there any obvious causes to the downed power line that you can see from a safe distance?,"Looks like just our place, neighbours still have power.",document_further
+2_act,Reporting something smouldering nearby in Wainuiomata.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,Reporting a large new pothole in Featherston.,"Is the road still passable, or is it fully blocked?","Still passable, cars are just going around it carefully.",document_further
+2_act,There's smoke rising from the reserve near Churton Park.,"Can you see any actual flames, or is it just smoke/smell so far?",No flames yet but the smoke's definitely getting thicker.,"call_111, check_neighbours"
+2_act,Just noticed a strong gas smell near the shops around Kapiti.,"How strong is the smell, and are you feeling dizzy or lightheaded?","Fairly mild, I feel okay.","monitor_situation, check_neighbours"
+2_act,"Reporting an unusual, hard-to-place smell in Waikanae.",Does it smell like gas? ,"Yes, it's a very strong smell, people are leaving the area and someone said they feel dizzy.","call_111, evacuate"
+2_act,Someone stuck on the cliff path on our street in Taita.,Do you know if anyone's been able to check on them directly yet?,No one's been able to reach them and it's been hours now.,"call_111, check_neighbours"
+2_act,There's water coming up through a drain near Churton Park.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Only a centimetre or two, doesn't seem to be rising anymore.",none
+2_act,There's water coming up through a drain near Miramar.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,Shifted ground near the retaining wall on our street in Greytown.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ","Just early signs, nothing's actually come down yet.",monitor_situation
+2_act,Reporting shifted ground near the retaining wall in Seatoun.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ",A bit of soil and small rocks have come down already.,"monitor_situation, document_further"
+2_act,Reporting a concerned group gathered nearby in Kapiti.,Do you know if anyone's been able to check on them directly yet?,No one's been able to reach them and it's been hours now.,"call_111, check_neighbours"
+2_act,A vehicle hitting a power pole on our street in Roseneath.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Someone's limping but walking, looks like they might need a check-up.",call_111
+2_act,Just noticed rain coming down very hard around Tawa.,"Is the rain causing any pooling or flooding near you, or just heavy?",Water's coming into the garage now and rising quickly.,"call_111, monitor_situation"
+2_act,Reporting an elderly neighbour not answering all day in Avalon.,Do you know if anyone's been able to check on them directly yet?,No one's been able to reach them and it's been hours now.,"call_111, check_neighbours"
+2_act,Reporting a cracking sound from the hillside in Tawa.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ",A large section has given way and it's still moving.,"call_111, evacuate"
+2_act,Reporting a large new pothole in Linden.,"Is the road still passable, or is it fully blocked?","Still passable, cars are just going around it carefully.",document_further
+2_act,Just noticed a tree fallen across the road around Southgate.,"Is the road still passable, or is it fully blocked?","One lane's blocked, traffic's backed up quite a bit.","monitor_situation, document_further"
+2_act,There's flooding near the local shops near Paparangi.,"Can you tell us roughly how deep the water is, and whether it's still rising?",Knee-deep outside our house now and rising fast.,"call_111, evacuate"
+2_act,Reporting nonstop heavy rain in Petone.,"Is the rain causing any pooling or flooding near you, or just heavy?",Starting to pool in the driveway and gutters can't keep up.,monitor_situation
+2_act,A gentle tremor on our street in Thorndon.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,Just noticed a new crack across the driveway around Karori.,"Is it just cosmetic, or does it look like it might be structural?","Looks serious, part of the wall is visibly out of alignment now.","call_111, evacuate"
+2_act,Just noticed a small slip on the bank behind the house around Mount Victoria.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ","Just early signs, nothing's actually come down yet.",monitor_situation
+2_act,There's a strong shake near Paparangi.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?",Very strong — a shelf came down and there's a new crack across the wall.,"call_111, document_further"
+2_act,"An unusual, hard-to-place smell on our street in Thorndon.",Does it smell like gas? ,"No, it smells like rubbish",none
+2_act,Reporting a multi-car crash in Lower Hutt.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?",Someone's not moving and others are crowded around them.,call_111
+2_act,There's very strong wind gusts near Khandallah.,"Has anything actually been damaged, or is it just noisy so far?","Just noisy so far, nothing damaged that I can see.",none
+2_act,There's torrential rain near Highbury.,"Is the rain causing any pooling or flooding near you, or just heavy?",Starting to pool in the driveway and gutters can't keep up.,monitor_situation
+2_act,Reporting a spreading damp patch on the ceiling in Maupuia.,"Is it just cosmetic, or does it look like it might be structural?","Looks serious, part of the wall is visibly out of alignment now.","call_111, evacuate"
+2_act,Reporting a burning smell with no flames visible in Newlands.,"Can you see any actual flames, or is it just smoke/smell so far?","Yes, I can see flames now, and it looks like it's spreading.","call_111, evacuate"
+2_act,Smoke rising from the reserve on our street in Paraparaumu.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,A multi-car crash on our street in Newtown.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?","Doesn't look like anyone's hurt, just some vehicle damage, people are out and talking.",document_further
+2_act,Just noticed windows rattling from a shake around Waitangirua.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Pretty mild, just a wobble — nothing fell or broke that I can see.",none
+2_act,There's thick smoke drifting through the street near Rongotai.,"Can you see any actual flames, or is it just smoke/smell so far?","Just smoke, no flames visible, and it's not getting any thicker.",monitor_situation
+2_act,There's an odd water level at the wharf near Plimmerton.,"When did you first notice the odd water level, and have you heard any unusual sounds coming from the sea, or felt any ground shaking? ","Never seen anything like it, and people are still out on the beach. I didn't hear or feel anything by the sea. ",monitor_situation
+2_act,Just noticed a slip blocking part of the walking track around Southgate.,"Is it raining in the area, is there any other signs of movement on the slope (e.g., falling rocks, water flowing out of the slope, trees tipping over)? ","It's not raining anymore, no water is coming out but trees are tipped over. ","call_111, evacuate"
+2_act,There's an unusually low tide near Thorndon.,"When did you first notice the unnusually low tide, and have you heard any unusual sounds coming from the sea, or felt any ground shaking? ","I noticed it just now, and I heard a large booming sound coming from the ocean. ",evacuate
+2_act,There's a collapsed fence panel near Glenside.,"Is it just cosmetic, or does it look like it might be structural?","Looks pretty minor and cosmetic, not affecting anything else.",none
+2_act,Reporting torrential rain in Crofton Downs.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,Just noticed a motorbike accident around Carterton.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?",Someone's not moving and others are crowded around them.,call_111
+2_act,There's water rising fast in the gutter near Rongotai.,"Can you tell us roughly how deep the water is, and whether it's still rising?",Knee-deep outside our house now and rising fast.,"call_111, evacuate"
+2_act,There's a collapsed fence panel near Tawa.,"Is it just cosmetic, or does it look like it might be structural?","Looks pretty minor and cosmetic, not affecting anything else.",none
+2_act,Water coming up through a drain on our street in Owhiro Bay.,"Can you tell us roughly how deep the water is, and whether it's still rising?","Ankle-deep and rising slowly, cars are still getting through.","monitor_situation, check_neighbours"
+2_act,Rain coming down very hard on our street in Berhampore.,"Is the rain causing any pooling or flooding near you, or just heavy?","Just heavy so far, no pooling that I've noticed.",none
+2_act,There's the house swaying near Lyall Bay.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?","Fairly strong — a couple of things fell off a shelf, nothing major broken.","monitor_situation, document_further"
+2_act,Just noticed a wall bulging at the base around Newtown.,When did you first notice the bulging and did it start after heavy rainfall? ,"Seems to be spreading a bit, worth keeping an eye on.","monitor_situation, document_further"
+2_act,Just noticed a spreading damp patch on the ceiling around Mount Victoria.,"Is it just cosmetic, or does it look like it might be structural?","Looks pretty minor and cosmetic, not affecting anything else.",none
+2_act,There's two cars colliding near Brooklyn.,"Can you tell us if anyone appears to be hurt, or if it's just vehicle damage?",Someone's not moving and others are crowded around them.,call_111
+2_act,There's a sudden jolt near Upper Hutt.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?",Very strong — a shelf came down and there's a new crack across the wall.,"call_111, document_further"
+2_act,There's a sharp jolt near Whitby.,"Can you confirm roughly how strong the shaking felt, on a scale from barely noticeable to extreme shaking that damaged or destroyed buildings?",Very strong — a shelf came down and there's a new crack across the wall.,"call_111, document_further"
