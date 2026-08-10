@@ -17,6 +17,10 @@ statement 04: *"Help emergency staff sort and prioritise incoming information."*
 Two small, fully fine-tuned models (Phi-3.5-mini) do the AI work — no third-party LLM API calls,
 anywhere.
 
+**Licence:** [Business Source License 1.1](LICENSE) — free to view, copy, and use for development,
+testing, and demonstration; production use requires a commercial license from the licensor. The
+license converts automatically to Apache License 2.0 on 2030-08-10.
+
 ## Prerequisites
 
 - Python 3.10+ and `pip`
