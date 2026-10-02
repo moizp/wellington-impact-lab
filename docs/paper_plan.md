@@ -203,13 +203,35 @@ rows, not eyeballing logs.
 | **A** | `bart-base` (optionally `distilbart` variant) | ~140M | encoder-decoder | **full** (generates both lines) | HF Transformers (+PEFT LoRA) |
 | **C** | `distilbert-base-uncased` | ~66M | encoder + class head | severity only | HF Transformers (+PEFT LoRA or full FT) |
 | **C′** | `bert-base-uncased` | ~110M | encoder + class head | severity only | capacity ablation of C (Stage 0 + one run) |
-| **D** (optional) | a ~1B decoder, e.g. Llama-3.2-1B-Instruct | ~1.2B | decoder | full | **MLX LoRA → GGUF — identical pipeline to baseline** |
+| **D** (optional, conditional) | a ~1B decoder **whose architecture differs materially from Phi-3.5** (see below) | ~1B | decoder | full | **MLX LoRA → GGUF — identical pipeline to baseline** |
 
 Recommendation: **finalists A and C** (answers the stated BART/BERT question; A is the only
-small model covering the full contract). Add **D** if budget allows, because it is the only
-candidate whose training *and* serving path are identical to the baseline, which isolates model
-size from pipeline differences. Verify exact model IDs, licences and availability at the start of
-Stage 0 (Llama weights carry a community licence — check before publishing derived weights).
+small model covering the full contract). Add **D** only if it passes the architecture-difference
+test below. Verify exact model IDs, licences and availability at the start of Stage 0.
+
+**Candidate D inclusion rule.** D is included only if it is *architecturally* different from the
+baseline, not merely smaller — otherwise the comparison reduces to "same architecture, fewer
+parameters", which adds little. Phi-3.5-mini is a dense, decoder-only, Llama-style transformer
+(multi-head attention, ~32k vocabulary, ~3.8B parameters). A ~1B Llama-3.2 model is *not*
+significantly different in kind: it is the same dense decoder design, differing in size,
+grouped-query attention, vocabulary (~128k) and tied embeddings. So Llama-3.2-1B alone does **not**
+qualify as D.
+
+D qualifies if it differs on at least one *structural* axis and still has both an `mlx_lm` LoRA
+path and a llama.cpp/GGUF path (so the pipeline stays identical to the baseline's). Shortlist to
+check against each model's `config.json` and the installed `mlx_lm` / `llama.cpp` support lists
+(from memory, **not yet verified**):
+
+| Option | Structural difference vs Phi-3.5 |
+|---|---|
+| Gemma-3-1B | interleaved local sliding-window / global attention, GQA, very large vocabulary |
+| LFM2-1.2B-class | hybrid gated short-convolution + attention blocks (not a pure transformer) |
+| A Mamba/SSM ~1B model | no attention — state-space recurrence (GGUF support must be confirmed) |
+| Llama-3.2-1B / Qwen-class ~1B | fallback only: same dense design; usable as a *size-only* control, labelled as such |
+
+If none passes the support check, drop D rather than substitute a same-architecture model under a
+different name. Check licences before publishing derived weights (several of these carry custom
+licences).
 
 Baseline reference rows to run in addition to B0 (cheap, make the paper stronger):
 
@@ -252,9 +274,20 @@ Deliverables, in order:
    - **Size**: target 300–360, **floor 150**. (Paired-difference power: with ~15% of items on
      which two models disagree, a 95% CI half-width of ±4 points needs n ≈ z²·d/h² ≈ 360; n=150
      gives ≈ ±6 points. Below the floor, results are exploratory only.)
-   - **Labels**: severities assigned per the project's documented severity-calibration rule by
-     someone other than the training-data author, with a second annotator on at least a third of
-     rows; report Cohen's κ. Disagreements resolved and logged.
+   - **Authoring (decided, D2)**: candidate rows are *machine-drafted, then human-verified or
+     corrected*. To keep the test set independent and auditable:
+     - Drafts come from a generator that is **not** one of the candidates being evaluated
+       (avoids circularity), using a prompt that is committed to the repo; record generator,
+       prompt version and date per row.
+     - Every row carries `human_action` ∈ {accepted, edited, rejected} and an annotator ID
+       (A1, A2 — IDs only, no personal details in the repo). Rejected rows are kept in an audit
+       file, not silently dropped.
+     - **Anchoring audit**: for at least a third of rows, the annotator assigns severity *before*
+       seeing the drafted label; report agreement between blind label and draft, and Cohen's κ
+       between two annotators on an overlapping subset. A high edit rate on `high` rows is a
+       finding, not a failure.
+     - Labels follow the documented severity-calibration rule; disagreements resolved and logged.
+     - Drafted rows still pass the leakage tests below against train/valid.
    - **Frozen** by SHA-256 committed in the repo; never used for hyperparameter or checkpoint
      selection; touched once per final configuration (§5).
    - Same canonical render path (`context.render_context_text`, `classifier.build_user_message`).
@@ -345,8 +378,8 @@ and confirms the *magnitude* of the saving rather than discriminating. If a cand
 Three-way outcome, stated up front to handle small-n noise: **non-inferior** (CI lower bound >
 −5), **inferior** (CI upper bound < 0 *and* point estimate ≤ −5), otherwise **inconclusive** →
 enlarge the test set (or add CV) and re-run; do not call an inconclusive result a win or a loss.
-The 5-point margin is a judgement about acceptable regression for a triage aid that a human
-staff member reviews; owners may tighten it, but only before Stage 2 starts (D3).
+The 5-point margin and the 2× gate are decided (D3, §8) and explained in §9; they are frozen
+by commit before Stage 2 starts.
 
 ---
 
@@ -402,17 +435,72 @@ licences before releasing fine-tuned weights.
 
 ---
 
-## 8. Decisions needed from the project owners
+## 8. Decisions
 
-| # | Decision | Default if unanswered |
+| # | Decision | Status |
 |---|---|---|
-| D1 | Encoder candidates emit no rationale: accept a severity-only contract variant (rationale `null` or deterministically templated from context), or exclude them? | Evaluate severity-only; rationale `null`; paper states the contract delta |
-| D2 | Who authors/labels the independent test set, and is a second annotator available? | Test-set authoring is the schedule-critical item; without an independent author, report results as exploratory |
-| D3 | Accuracy regression tolerance (default −5 points non-inferiority margin) and the 2× resource gate | As written in §4/§5; frozen by commit before Stage 2 |
-| D4 | Include candidate D (≈1B decoder) as a third finalist? | Include only if time allows after A and C |
-| D5 | Which machine runs the dev benchmarks, and which x86 environment is used for Stage 3? | Local Apple Silicon for dev; GCP x86 CPU for Stage 3 |
+| D1 | Severity-only candidates (no rationale) | **Decided: acceptable** — severity is the main output. Encoder candidates are scored on the severity-only contract; the paper states the contract delta. Still to settle in implementation: `rationale` = `null` vs. a deterministic template (default `null`; the dashboard already hides a missing rationale) |
+| D2 | Test-set authoring | **Decided:** machine-drafted candidate rows, human-verified/corrected (protocol in §3 item 3) |
+| D3 | Accuracy tolerance and resource gate | **Decided:** 5-point non-inferiority margin; 2× gate (explained in §9) |
+| D4 | Candidate D (~1B decoder) | **Decided: optional, conditional** on being architecturally different from Phi-3.5 (§2) |
+| D5 | Dev machine and Stage 3 x86 environment | Open — default: local Apple Silicon for dev; GCP x86 CPU for Stage 3 |
 
-## 9. Files this plan will add (none exist yet)
+## 9. Todos
+
+Rationale for the two frozen thresholds (include this reasoning in the paper's methods section):
+
+- **5-point accuracy margin (non-inferiority).** We are not trying to prove the candidate is
+  *better*; we are asking whether it is *not meaningfully worse* while being much cheaper. The
+  margin is the largest accuracy loss we would accept in exchange for the resource saving. 5
+  points is chosen because (a) the output is a triage aid that a staff member reviews, not an
+  autonomous decision, so a small regression is tolerable; (b) the test set is small enough
+  (~150–360 rows) that its sampling noise is already ±4–6 points, so a tighter margin could not be
+  verified and would produce mostly "inconclusive" results; (c) severity labels are subjective,
+  so differences below this are within plausible annotator disagreement. The rule uses the
+  *lower bound of the paired 95% CI*, not the point estimate, so noise cannot rescue a candidate.
+  It is paired with a separate safety rule (no extra gold-`high` → not-`high` errors) because
+  average accuracy can hide a worse miss rate on the costly class.
+- **2× resource gate.** A migration has fixed costs (a new training/serving path, ONNX or other
+  runtime, re-validation, maintenance). A gain under ~2× would be inside the run-to-run and
+  dev-vs-production measurement drift we expect and would not change which Cloud Run instance
+  size is viable; ≥ 2× on *both* peak memory and p95 latency is a conservative threshold at which
+  the saving is real, survives the Stage 3 environment change, and can plausibly justify a smaller
+  instance. Both metrics must pass so a candidate cannot win on memory while being slower.
+
+Checklist (tick as done):
+
+**Stage 1 — gaps**
+- [ ] Reconcile `triage_examples.csv` vs `_corrected.csv`; pin one canonical CSV by SHA-256; fix the generator
+- [ ] Persist a stable, stratified split (`row_id`, `triage_splits.json`)
+- [ ] Draft test-set rows with a non-candidate generator (committed prompt); record provenance per row
+- [ ] Human verify/correct drafts; blind-label ≥ ⅓ for the anchoring audit; second annotator on an overlap subset; report κ
+- [ ] Freeze the test set (SHA-256 committed); reach ≥ 150 rows, target 300–360, ≥ 40 `high`
+- [ ] Leakage tests (exact, near-duplicate, split stability) in CI
+- [ ] Strict grader + contract tests (strict vs. lenient parser agreement)
+- [ ] `benchmark_model.py`, `compare_rows.py`, determinism test
+- [ ] Reproduce the baseline row (and the quantisation, zero-shot and trivial-classifier controls)
+- [ ] Commit `gates.yaml` with the 5-point margin and 2× gate **before** any Stage 2 run
+
+**Stage 0 — screening**
+- [ ] Verify tooling caveats (§2): BERT/BART support in `mlx_lm` LoRA and in llama.cpp GGUF; pick serving runtimes
+- [ ] Benchmark B0, A, C, C′ (and D if it qualifies) on CPU, 3 repeats; apply the 2× gate
+
+**Reduce confounding factors (per model family)**
+- [ ] For each family, find its *best* fine-tuning recipe and its *best* serving architecture instead of reusing the baseline's settings, so differences reflect the models rather than a recipe tuned for Phi-3.5:
+  - Fine-tuning: LoRA (rank, target layers, learning rate, steps) vs. full fine-tuning for the small encoders/BART; class-imbalance handling; max sequence length / truncation policy for the 512-token encoders.
+  - Serving: for each family, compare runtimes and precisions (e.g. GGUF quant levels, ONNX Runtime fp32 vs. int8, CTranslate2 for BART, PyTorch as reference) and pick the best accuracy/resource trade-off *using valid, not test*.
+- [ ] Give every family the same tuning *budget* (equal number of trials), with a family-specific search space; record every trial
+- [ ] Report two comparisons: each family at its tuned best (what you would deploy) and all families under one controlled setting (same runtime where possible, same threads, same prompt length) — and state which differences are runtime-, precision- or architecture-driven
+- [ ] Run the baseline through the same tuning protocol (LoRA settings, Q4_K_M vs. higher-precision quants) so it is not the only untuned model in the table
+
+**Stage 2 / 3 / paper**
+- [ ] Fine-tune A, C (and C′, D if included), 3 seeds each; single test-set pass per final config
+- [ ] Gate 1 verdicts: non-inferior / inferior / inconclusive; Holm-corrected
+- [ ] Stage 3 production-class validation and dashboard smoke test (both full and severity-only contracts)
+- [ ] Decide D5 (machines); confirm model and data licences before releasing any weights
+- [ ] Draft the paper (§7 outline) and the reproducibility package
+
+## 10. Files this plan will add (none exist yet)
 
 ```
 backend/eval/benchmark_model.py   backend/eval/grader.py     backend/eval/compare_rows.py
