@@ -184,6 +184,9 @@ Row schema (sketch):
            "avg_s": 0, "p50_s": 0, "p95_s": 0, "p99_s": 0, "tok_per_s": 0},
   "quality": {"n": 0, "format_pass": 0, "sev_acc": 0, "pass_rate": 0, "macro_f1": 0,
               "under_triage": 0, "by_meta_category": {}, "ci95": {"pass_rate": [0, 0]}},
+  "setup": {"finetune": {"scores": {}, "median": 0, "raters": 2, "steps": 0, "manual_interventions": 0,
+                         "errors_hit": 0, "time_to_first_run_h": 0},
+            "serving": {"apple_silicon": {}, "gcp_x86": {}}},
   "contract": "full | severity_only"
 }
 ```
@@ -383,6 +386,49 @@ and confirms the *magnitude* of the saving rather than discriminating. If a cand
 - Robustness slice (small, mechanical): typo/paraphrase/long-report perturbations of test rows —
   reports degradation, not a gate.
 
+**Setup-effort evaluation (subjective, structured)**
+
+A model that scores well but is painful to fine-tune or serve has a real cost the other metrics
+miss (the baseline's own pipeline notes in `docs/BUILD_PLAN.md` list over a dozen gotchas). This
+is a *subjective* measure, so the plan makes it as structured and auditable as possible rather
+than a free-text impression. It is reported alongside the quantitative results and is **never a
+gate** — it cannot rescue a candidate that fails Gate 0/1, and it is used only to rank candidates
+that are otherwise comparable.
+
+- **Two separate ratings per model**: *fine-tuning setup* and *serving setup* (serving rated per
+  environment: Apple Silicon and GCP x86 CPU).
+- **Rubric** — each dimension scored 1 (very difficult) to 5 (very easy) with written anchors
+  committed beforehand (`backend/eval/setup_rubric.md`) so scores mean the same thing across
+  models:
+  1. Documentation and examples (does an official, current recipe exist for this task?)
+  2. Tooling maturity and support (is the model/architecture supported out of the box, or does it
+     need patches/workarounds?)
+  3. Number of manual steps (conversion, quantisation, export, glue code)
+  4. Debugging burden (how opaque or time-consuming were the failures hit?)
+  5. Dependency and version fragility (pinning needed, breakage on upgrade)
+  6. Reproducibility (does a clean machine reproduce the result from the written steps?)
+  7. Portability (Apple Silicon → GCP x86 without changes?)
+  8. Operational complexity at serving time (artifact count/size, container build, runtime
+     dependencies, cold-start surprises)
+- **Contemporaneous log, not recollection**: whoever does the work keeps a dated setup log
+  (`results/setup_logs/<model>_<phase>.md`) recording each step, each error and its fix, each
+  workaround, and elapsed time — scores are assigned from the log at the end of the phase.
+- **Objective counters recorded next to the scores** so the subjective rating can be checked:
+  steps in the written recipe, manual interventions, distinct errors hit, **time to first
+  successful end-to-end run** (separate from training time), extra dependencies beyond the
+  baseline's, lines of glue/conversion code, number of deployable artifacts.
+- **Raters**: at least two people score independently from the same log before discussing; report
+  the median and range per dimension, and the disagreement. Rater IDs only (A1, A2), no personal
+  details in the repo.
+- **Bias controls**: (a) the team already knows the baseline pipeline, which flatters it → rate the
+  baseline from its documented gotchas *and* have one rater who did not build it follow the written
+  recipe on a clean machine; (b) fix the order in which candidates are set up and note it (later
+  ones benefit from experience gained earlier); (c) give every candidate the same time-box for
+  getting a first working run, and record "not achieved within time-box" as a result, not a
+  missing value.
+- Reported as a compact table and radar/heat-map in the paper, clearly labelled subjective, with
+  the rubric and logs in the reproducibility package.
+
 **Pre-registered decision rules (Gate 1)** — all must hold for a candidate to be recommended:
 
 | Criterion | Rule |
@@ -438,6 +484,7 @@ Threats to validity to state plainly:
 - Fully synthetic, small, single-team-authored data → in-distribution, may not transfer to real
   public reports; the test set mitigates author overlap but not synthetic-ness.
 - Label subjectivity (severity); κ reported.
+- The setup-effort measure is subjective, depends on the rater's prior familiarity, and on a single team's tooling experience (§5 bias controls); it is reported as supporting evidence only.
 - Runtime/quantisation confounds across model families (§2 caveats).
 - Test-set size limits resolvable effect sizes (§3 item 3).
 - Hazard-planning data, not live emergency information: results say nothing about fitness for
@@ -510,6 +557,14 @@ Checklist (tick as done):
 - [ ] Report two comparisons: each family at its tuned best (what you would deploy) and all families under one controlled setting (same runtime where possible, same threads, same prompt length) — and state which differences are runtime-, precision- or architecture-driven
 - [ ] Run the baseline through the same tuning protocol (LoRA settings, Q4_K_M vs. higher-precision quants) so it is not the only untuned model in the table
 
+**Setup-effort evaluation**
+- [ ] Write and commit `setup_rubric.md` (8 dimensions, 1–5 anchors) before the first candidate is set up
+- [ ] Start a dated setup log per model per phase (fine-tuning; serving on Apple Silicon; serving on GCP); record steps, errors, workarounds, elapsed time, time to first end-to-end run
+- [ ] Fix the setup order and a per-candidate time-box for a first working run; record time-box failures explicitly
+- [ ] Two independent raters score from the logs; report median, range and disagreement
+- [ ] Have one rater who did not build the baseline pipeline follow its written recipe on a clean machine, to offset familiarity bias
+- [ ] Add the `setup` block to the result rows and a labelled-subjective table to the paper
+
 **Stage 2 / 3 / paper**
 - [ ] Fine-tune A, C (and C′, D if included) and re-train the baseline, 3 seeds each, timing every run with `train_timer.py` (total, time-to-best-checkpoint, per-step, peak memory, whole-tuning-budget time); single test-set pass per final config
 - [ ] Gate 1 verdicts: non-inferior / inferior / inconclusive; Holm-corrected
@@ -521,7 +576,7 @@ Checklist (tick as done):
 
 ```
 backend/eval/benchmark_model.py   backend/eval/grader.py     backend/eval/compare_rows.py
-backend/eval/train_timer.py
+backend/eval/train_timer.py   backend/eval/setup_rubric.md   results/setup_logs/
 backend/eval/backends/            backend/eval/gates.yaml    backend/tests/test_eval_*.py
 backend/data/triage_splits.json   backend/data/triage_test/test.jsonl   backend/data/triage_test.csv
 backend/scripts/train_hf_candidate.py   results/  (rows + predictions, committed)
