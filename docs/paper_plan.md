@@ -178,6 +178,8 @@ Row schema (sketch):
   "env": {"git_sha": "...", "dataset_sha256": "...", "model_sha256": "...", "libs": {}, "cpu": "..."},
   "static": {"params_m": 0, "disk_mb": 0, "quant": "Q4_K_M", "mean_prompt_tokens": 0},
   "memory": {"peak_rss_load_mb": 0, "peak_rss_infer_mb": 0, "metal_peak_mb": null},
+  "train": {"total_s": 0, "to_best_ckpt_s": 0, "s_per_step": 0, "samples_per_s": 0,
+            "tuning_budget_total_s": 0, "peak_train_mem_mb": 0, "trainable_params_m": 0, "seeds": 3},
   "time": {"load_s": 0, "cold_first_s": 0, "n": 100,
            "avg_s": 0, "p50_s": 0, "p95_s": 0, "p99_s": 0, "tok_per_s": 0},
   "quality": {"n": 0, "format_pass": 0, "sev_acc": 0, "pass_rate": 0, "macro_f1": 0,
@@ -346,7 +348,22 @@ and confirms the *magnitude* of the saving rather than discriminating. If a cand
 - **3 training seeds per candidate** (including B0, retrained under the same protocol so its seed
   variance is measured; the originally deployed artifact is also reported as-is). Report mean ± sd
   across seeds. A single run per model is not publishable evidence.
-- Record training cost too: wall-clock, peak training memory, trainable parameter count.
+- **Time to fine-tune is a measured outcome for every model tested** (baseline, A, C, C′, D),
+  recorded by a small wrapper (`backend/eval/train_timer.py`) around each training run so the
+  definition is identical across frameworks:
+  - total wall-clock for one full run (data load excluded, model load/tokeniser setup reported
+    separately);
+  - **time to best validation checkpoint** (wall-clock until the checkpoint that is finally
+    selected), plus time per step/epoch and training samples/s;
+  - total wall-clock of the *whole tuning budget* (all trials × seeds) — the realistic cost of
+    getting a model;
+  - peak training memory, trainable-parameter count, and number of steps/epochs actually used.
+  Report mean ± sd across the 3 seeds. All fine-tuning is timed on the same Apple Silicon machine,
+  idle otherwise, plugged in, same power mode, thermal state noted. **Caveat to state in the
+  paper:** training time also depends on framework (MLX for decoders vs. PyTorch-MPS/CPU for
+  BERT/BART), so it is a pipeline-level cost, not a pure architecture property; the controlled
+  comparison reports it per step on identical sequence lengths and batch size where the frameworks
+  permit. Optionally re-time one run per family on the GCP CPU environment.
 - Class imbalance handling (weights/oversampling) decided once, applied to all, stated.
 
 **Evaluation protocol**
@@ -443,7 +460,7 @@ licences before releasing fine-tuned weights.
 | D2 | Test-set authoring | **Decided:** machine-drafted candidate rows, human-verified/corrected (protocol in §3 item 3) |
 | D3 | Accuracy tolerance and resource gate | **Decided:** 5-point non-inferiority margin; 2× gate (explained in §9) |
 | D4 | Candidate D (~1B decoder) | **Decided: optional, conditional** on being architecturally different from Phi-3.5 (§2) |
-| D5 | Dev machine and Stage 3 x86 environment | Open — default: local Apple Silicon for dev; GCP x86 CPU for Stage 3 |
+| D5 | Environments | **Decided:** every candidate (and the baseline) runs on **Apple Silicon** (dev) and then on **GCP x86-64 CPU** (production-like, Stage 3). Note Apple Silicon is macOS (Darwin/arm64), not Linux — it is a dev proxy for Linux-style tooling, not the same OS or ISA as Cloud Run, which is exactly why Stage 3 exists. Fine-tuning and its timing happen on Apple Silicon only (see §5) |
 
 ## 9. Todos
 
@@ -494,16 +511,17 @@ Checklist (tick as done):
 - [ ] Run the baseline through the same tuning protocol (LoRA settings, Q4_K_M vs. higher-precision quants) so it is not the only untuned model in the table
 
 **Stage 2 / 3 / paper**
-- [ ] Fine-tune A, C (and C′, D if included), 3 seeds each; single test-set pass per final config
+- [ ] Fine-tune A, C (and C′, D if included) and re-train the baseline, 3 seeds each, timing every run with `train_timer.py` (total, time-to-best-checkpoint, per-step, peak memory, whole-tuning-budget time); single test-set pass per final config
 - [ ] Gate 1 verdicts: non-inferior / inferior / inconclusive; Holm-corrected
 - [ ] Stage 3 production-class validation and dashboard smoke test (both full and severity-only contracts)
-- [ ] Decide D5 (machines); confirm model and data licences before releasing any weights
+- [ ] Provision the GCP x86-64 CPU environment (matching the Cloud Run 4 vCPU / 16 GiB shape) and rerun the full benchmark there for every candidate; confirm model and data licences before releasing any weights
 - [ ] Draft the paper (§7 outline) and the reproducibility package
 
 ## 10. Files this plan will add (none exist yet)
 
 ```
 backend/eval/benchmark_model.py   backend/eval/grader.py     backend/eval/compare_rows.py
+backend/eval/train_timer.py
 backend/eval/backends/            backend/eval/gates.yaml    backend/tests/test_eval_*.py
 backend/data/triage_splits.json   backend/data/triage_test/test.jsonl   backend/data/triage_test.csv
 backend/scripts/train_hf_candidate.py   results/  (rows + predictions, committed)
