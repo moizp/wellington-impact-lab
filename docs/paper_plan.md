@@ -1,583 +1,639 @@
-# Paper plan — comparing fine-tuned candidates for the Triage Classifier
+# Paper plan — comparing fine-tuned and untrained candidates for HR-query triage
 
-**Status:** plan only — nothing in this document has been implemented or run. Thresholds in
-"Pre-registered decision rules" must be committed *before* any Stage 2 result exists, so the commit
-history proves they weren't tuned to the outcome.
+**Status:** plan only — nothing here has been implemented or run. Thresholds in "Pre-registered
+decision rules" (§7) must be committed *before* any Stage 2 result exists, so the commit history
+proves they weren't tuned to the outcome.
 
-**Research question.** For the hazard-report triage task (report + official context in →
-`severity` + one-sentence `rationale` out), can a smaller fine-tuned model (BERT/BART family, or a
-smaller decoder) match the current fine-tuned Phi-3.5-mini Q4_K_M on quality while using
-substantially less memory and latency on the production-class CPU target?
+**What changed from the previous version.** The original plan targeted the Wellington hazard-report
+Triage Classifier; it is preserved unchanged as `docs/paper_plan_triage.md`. This version:
+
+- swaps the task for a **stand-in HR-query task** (§1) so the method can be developed and
+  rehearsed on a clean, fully synthetic problem;
+- moves the baseline from Phi-3.5-mini to **Phi-4-mini-instruct**, and **newly fine-tunes** it
+  (there is no deployed model for this task);
+- puts the **policy text in the model input for every model** (option 1, §1.3);
+- adds an **untrained / zero- and few-shot arm** (§5, Stage Z; confirmed, D9);
+- re-derives the grader, test set, safety rule and gates for a two-label task (§3, §7);
+- **(review revision)** replaces `next_step` with a model-emitted **`resolution`** plus a
+  code-derived route (D8), makes **QWK the urgency endpoint** with a margin taken from annotator
+  agreement (D3′), requires **two annotators on every test row** (D10), and declares **one primary
+  endpoint family** with urgency and `resolution` as pre-registered secondary endpoints (D11).
+
+The method (single benchmark script, process-isolated memory/latency, strict mechanical grader,
+paired non-inferiority test, 2× resource gate, structured setup-effort rating) carries over.
+
+**Research question.** For a routing-and-reply task (HR query + relevant policy text in →
+`classification`, `urgency`, `resolution`, `summary` out; destination queue derived in code), can a smaller model — fine-tuned
+BERT/BART family, a smaller decoder, or an *untrained* instruct model with a prompt — match a
+fine-tuned Phi-4-mini-instruct (Q4_K_M) on quality while using substantially less memory and
+latency on a CPU-only production-class target?
 
 ```mermaid
 flowchart TD
-    A[Stage 1: close harness + test-set gaps] --> B[Stage 0: benchmark untrained candidates]
+    A[Stage 1: harness, grader, frozen test set, policy corpus] --> B[Stage 0: benchmark untrained-weights candidates for resources]
+    A --> Z[Stage Z: untrained instruct models, zero/few-shot, quality + resources]
     B --> G0{Gate 0: >=2x less memory AND p95 latency vs baseline on CPU?}
-    G0 -- no --> X0[Drop candidate; record row in paper as negative result]
-    G0 -- yes --> C[Stage 2: fine-tune, 3 seeds, same data + budget]
-    C --> G1{Gate 1: format >=99% AND non-inferior accuracy AND no extra high->low errors?}
-    G1 -- no --> X1[Report as quality-inferior; keep in paper tables]
+    G0 -- no --> X0[Drop; record negative result]
+    G0 -- yes --> C[Stage 2: fine-tune, 3 seeds, equal budget]
+    Z --> G1
+    C --> G1{Gate 1: format >=99% AND non-inferior AND safety rules hold?}
+    G1 -- no --> X1[Report as quality-inferior]
     G1 -- inconclusive --> N[Enlarge test set or CV, re-run]
     N --> G1
-    G1 -- yes --> D[Stage 3: Cloud Run-class validation]
-    D --> G2{Prod ratios still >=2x and E2E dashboard smoke test passes?}
+    G1 -- yes --> D[Stage 3: production-like validation]
+    D --> G2{Prod ratios still >=2x and E2E smoke test passes?}
     G2 -- no --> X2[No migration; report dev-vs-prod gap]
-    G2 -- yes --> M[Recommend migration]
+    G2 -- yes --> M[Recommend]
 ```
 
-Stage 1 is listed first because it is needed regardless of which candidate wins and Stage 0 only
-needs the benchmark script skeleton (not the test set). They can overlap; the order shown is the
-dependency order for *decisions*.
+---
+
+## 1. The task and its output contract
+
+### 1.1 Task (stand-in, fully synthetic)
+
+A general HR-department query (free text from an employee) is categorised on two parameters and
+answered with a recommended reply and routing:
+
+- **`classification`** ∈ {`leave_policy`, `complaint`, `hazard_report`, `hiring_request`,
+  `other_unclear`}
+- **`urgency`** ∈ {`low`, `medium`, `high`}
+- **`resolution`** ∈ {`answer_from_policy`, `escalate_to_human`, `ask_clarification`} (D8) —
+  model output carrying information *independent* of the class: whether the supplied policy
+  covers the question and whether a human must act.
+- **`summary`**: a one-to-two-sentence recommended response / case summary.
+- **Destination queue (`route`) is not a model output.** It is derived in code from
+  `classification` via a committed table (`eval/routing_table.yaml`; queue names provisional:
+  `leave_policy`→hr_services, `complaint`→employee_relations, `hazard_report`→health_safety,
+  `hiring_request`→recruitment, `other_unclear`→hr_triage) — the same "deterministic vs
+  model-inferred" split the Wellington system applies to `hazard_type`. The user-facing "next
+  step" is the pair (`resolution`, `route`).
+
+This is a *stand-in*: it exists to exercise the methodology on a task whose data can be authored
+freely. It is not part of the Wellington emergency-triage system. All data is synthetic: no real
+people, cases, names or organisations. This repo stays free of personal information (`CLAUDE.md`).
+
+### 1.2 Rules that make the labels gradable
+
+- **One label per query.** Queries with several intents get a written **precedence rule**
+  (proposed: `hazard_report` > `complaint` > `hiring_request` > `leave_policy`). Without it the
+  test labels measure annotator disagreement, not the models.
+- **`other_unclear` exists** so out-of-scope or ambiguous queries have a correct answer
+  (`resolution = ask_clarification`). Include these in train and test (≈ 10%).
+- **Urgency calibration rule** (written, committed before labelling), e.g. `high` = risk of
+  physical harm, allegations of harassment/discrimination, or a deadline within 48 h; `medium` =
+  time-bound but no harm; `low` = informational. Urgency is ordinal and subjective → the
+  **endpoint is quadratic-weighted κ (QWK)**, with exact match and within-one reported as
+  secondary measures, and model QWK always shown next to the **human–human QWK ceiling** (D3′).
+- **`resolution` gold rule** (written, committed before labelling): `answer_from_policy` = the
+  supplied clause covers the question and no human decision is needed; `escalate_to_human` = a
+  human must act (complaints, hazards, approvals) or the clause does not cover the question;
+  `ask_clarification` = the query is ambiguous or missing information. `resolution` still
+  correlates with class, which is why a class→resolution control exists (§3.5).
+- **Urgency correlates with class** (hazards mostly high, leave mostly low). That is realistic,
+  and it makes "class-only → urgency" a useful trivial control (§3).
+
+### 1.3 Policy text is in the input for every model (decision D7)
+
+Fine-tuning on policy Q&A alone would put facts in the weights: they are unreliable on
+paraphrased or novel questions, go stale when policy changes, and cannot be checked by a
+mechanical grader. Instead:
+
+- A small **synthetic policy corpus** (≈ 30–60 short clauses: leave entitlements, complaint
+  procedure, hazard-reporting procedure, hiring-request process) is committed with stable clause
+  IDs.
+- Each example's input = the query **plus the relevant clause(s)** (gold clause + 1–2 distractors,
+  fixed per example). Retrieval is *given*, not tested: the benchmark measures grounding and
+  routing, not search. State this limitation.
+- **The same canonical render function** builds this input for training data, the benchmark, and
+  any serving code (`build_user_message(query, clauses)`); a test asserts the stored test text
+  equals the render output. Training data is built with policy present, so fine-tuned models
+  learn to *use* the text, not memorise it.
+- **Frontier/untrained models get the identical rendered input** — no extra hints — so quality
+  gaps reflect the models, not different inputs.
+- **Held-out clauses.** A slice of the test set uses clauses never seen in training (new
+  entitlement numbers / procedures), to show the models read the snippet rather than recall
+  training facts.
+- **Abstention cases.** Some examples carry no clause that answers the question; the correct
+  behaviour is `resolution` ∈ {`escalate_to_human`, `ask_clarification`} (never `answer_from_policy`) and a summary that states no figure. This makes abstention directly gradable.
+
+### 1.4 Output format and mechanical checks
+
+Raw model output is exactly four lines, in order:
+
+```
+Classification: <leave_policy|complaint|hazard_report|hiring_request|other_unclear>
+Urgency: <low|medium|high>
+Resolution: <answer_from_policy|escalate_to_human|ask_clarification>
+Summary: <1-2 sentences>
+```
+
+The strict grader (`eval/grader.py`; rejects, never defaults) checks:
+
+1. **Format**: exactly four lines, label spelling, enum membership, lowercase, summary non-empty
+   and ≤ N tokens / ≤ 2 sentences, no trailing text, EOS reached before `max_new_tokens`
+   (truncation = fail).
+2. **Semantic**: `classification`, `urgency` and `resolution` equal gold; urgency also scored ordinally (QWK, within-one).
+3. **Route derivation**: the code-derived `route` for the predicted class is computed through
+   the same `routing_table.yaml` used for gold labels; a test asserts a gold row's route equals
+   the table's output. A critical misroute (§7) is a *class* error visible through this table.
+4. **Grounding (mechanical)**: every number/duration/date token in `summary` also appears in the
+   supplied clause text; on abstention examples the summary contains none. A wrong figure is a
+   hard fail — this is the hallucination check the format grader alone cannot do.
+5. **Safety-weighted**: confusion matrices; the specific costly errors in §7.
+
+Summary *prose quality* is not mechanically gradable. It is **not** in the pass rate and never a
+gate. Report mechanical properties only (length, sentence count, non-empty, grounding), plus an
+optional, clearly secondary reference-based similarity (e.g. BERTScore).
+
+**Pass rate (primary generative metric)** = format valid ∧ classification correct ∧ urgency correct
+∧ resolution correct ∧ grounding clean. **Descriptive only** — not an endpoint (D11). **Per-field
+metrics** are always reported, since the joint metric is harsh when urgency labels are noisy.
+
+**Non-generative candidates (D1, generalised).** BERT/DistilBERT use classification heads and
+cannot write a summary. They are scored on the **labels-only contract**
+(`classification`, `urgency`, `resolution`; three heads) and `contract: labels_only` is
+recorded in every row; only generative candidates are scored on the full contract. `summary` is
+`null` for labels-only candidates (default; to settle in implementation).
 
 ---
 
-## 0. Investigation findings (what the repo has today)
-
-### 0.1 Is there an eval harness? — **No. Gap.**
-
-- No script, test, or notebook grades model outputs. The only quality signal ever used was
-  **validation loss** printed by `mlx_lm.lora` (checkpoint "iter 100" picked from it — see
-  `docs/FINETUNE_PLAN.md` Next steps item 6). Loss is not task accuracy and says nothing about
-  format validity.
-- `docs/BUILD_PLAN.md` step 4 ("validate each adapter against a small held-out set… even 10
-  examples") and `docs/PITCH.md` ("build a labeled evaluation set for the classifier") both list
-  evaluation as **future work**; neither was done.
-- The existing parser is **unsuitable as a grader**: `classifier.parse_triage_output()` silently
-  defaults a missing/invalid severity to `"medium"` and a missing rationale to
-  `"No rationale produced."`. A model emitting garbage would "parse" and score as `medium` — this
-  would hide exactly the failures the paper must measure. The harness needs a **strict** parser
-  (reject, don't default) while still sharing the same format definition so the two can't drift.
-- Serving uses `temperature=0.2` (`classifier.py`), so production outputs are not deterministic.
-  The harness must use greedy decoding (temp 0, fixed seed) so reruns on the same weights give the
-  same score; the serving setting is reported separately as a sensitivity check.
-
-### 0.2 Is there a held-out test set with zero overlap? — **No. Gap.**
-
-What exists: `backend/data/triage/{train,valid}.jsonl` (181 / 46 rows), generated from a 227-row
-CSV by `scripts/generate_triage_dataset.py` (seeded shuffle, 80/20).
-
-Verified by direct check on the committed files:
-
-| Check | Result |
-|---|---|
-| Identical `report_text` in both train and valid | 0 |
-| Identical full user message in both | 0 |
-| Valid→train max token-Jaccard on report text | < 0.6 (no near-duplicates at that threshold) |
-
-So train/valid are cleanly separated **as files**. That does not make `valid.jsonl` a test set:
-
-1. **It was used for model selection.** Checkpoint choice was made on its loss → it is a
-   validation set; reusing it for the headline number is optimistic by construction.
-2. **The split is unstable.** The script reshuffles the *whole* CSV every run; any row
-   added/edited moves rows between train and valid. A model selected on an old valid can have
-   trained on rows now in valid. No row IDs, no persisted split.
-3. **Not stratified.** `high` is 11/46 (24%) of valid vs 21/181 (12%) of train. Valid has only 11
-   `high` rows → per-class numbers are extremely noisy.
-4. **Too small.** n=46 → a 95% interval on accuracy is roughly ±12 points. Cannot resolve a
-   few-point regression.
-5. **Provenance mismatch.** The script reads `data/triage_examples.csv`; docs say the deployed
-   weights were trained on `triage_examples_corrected.csv`. The committed JSONL's rationales match
-   the *original* CSV 227/227 and the corrected CSV 226/227 (after whitespace stripping). Which
-   data produced the deployed GGUF cannot be established from the repo. The paper needs one
-   hash-pinned dataset.
-6. **Single-source, fully synthetic.** All rows are authored by the same small team in one style;
-   scores measure in-distribution performance on synthetic reports and must be framed that way
-   (threat to validity, §7).
-
-### 0.3 What does the consumption layer require? — format is strict where it matters
-
-Producer: `classifier.py` → `main._triage()` → `Event.severity` / `Event.rationale` →
-`GET /events` → dashboard (`frontend/src/routes/dashboard/+page.svelte`, `lib/severity.ts`,
-`lib/Map.svelte`).
-
-| Requirement | Source | Consequence of violation |
-|---|---|---|
-| Raw text is exactly two lines: `Severity: <low\|medium\|high>` then `Rationale: <one sentence>` | `SYSTEM_PROMPT`, training targets | Parser falls back to defaults (silent wrong data) |
-| `severity` ∈ {`low`,`medium`,`high`}, **lowercase, exact** | `VALID_SEVERITIES`; `SEVERITY_COLORS` and `SEVERITY_RANK` are exact-key lookups | Unknown value → grey pin, excluded from filter counts, rank 0 in cluster "worst severity" |
-| `rationale` non-empty, one sentence, shown as text + tooltip | dashboard `{#if selectedEvent.rationale}` | Empty → backend substitutes placeholder; multi-sentence/truncated text shown as-is |
-| Output must finish within `max_tokens=80` | `classifier._stub_generate` | Truncated mid-sentence or missing `Rationale:` line |
-| Input is the canonical render: `build_user_message(report, render_context_text(...))` + `SYSTEM_PROMPT` | `classifier.py`, `context.py` | Train/serve drift (project's stated top risk) |
-| `hazard_type` is **never** model output | `main._triage` (deterministic) | n/a — candidates must not be asked to produce it |
-| Call is synchronous inside an `async` handler | `main._triage` → `classifier.triage` | A slow model blocks the event loop → latency is a throughput issue, not just UX |
-
-**Implication for non-generative candidates.** BERT/DistilBERT with a classification head can emit
-`severity` but not a rationale. The dashboard tolerates a missing rationale (conditional render;
-`Event.rationale` is `Optional`), but the backend currently substitutes "No rationale produced."
-→ this is a **contract variant** needing an explicit owner decision (§8, D1). The paper reports
-encoder candidates against the *severity-only* sub-contract and says so; only generative
-candidates (BART, decoder) are scored on the full contract.
-
-**What the harness must check (all mechanical, no LLM judge):**
-1. *Format*: strict regex over the whole output — exactly two lines, in order, label spelling,
-   severity in the enum, rationale non-empty, single sentence, ≤ N tokens, no trailing text, EOS
-   reached before `max_tokens` (truncation = fail).
-2. *Semantic*: predicted severity == gold severity.
-3. *Safety-weighted*: confusion matrix; **under-triage** (gold `high` → predicted `low`/`medium`)
-   reported separately, because a missed high is the costly error for emergency staff.
-4. *Contract*: pushing the output through the real `parse_triage_output` and a pydantic `Event`
-   yields the same `severity` the strict parser found (guards against the two parsers diverging).
-
-Rationale *text quality* is not mechanically gradable. It is **not** part of the pass rate; report
-only mechanical rationale properties (length, one sentence, non-empty, no copy of the severity
-word contradicting the label) and, as a clearly labelled secondary result, optional
-reference-based similarity (e.g. BERTScore) — never a gate.
-
----
-
-## 1. The single benchmark script
+## 2. The single benchmark script
 
 `backend/eval/benchmark_model.py` — one entry point, identical for every candidate and the
 baseline:
 
 ```bash
 python -m eval.benchmark_model \
-  --task triage \
-  --model <path-or-hf-id> \
-  --backend {llamacpp,mlx,hf,onnx} \
-  --split {test,valid}  --n-runs 100 --threads 4 --device cpu \
+  --task hr_query --model <path-or-hf-id> \
+  --backend {llamacpp,mlx,hf,onnx,ctranslate2} \
+  --mode {finetuned,zeroshot,fewshot} --k-shots 0 \
+  --split {test,valid} --n-runs 100 --threads 4 --device cpu \
   --out results/<run_id>.json --preds-out results/<run_id>.preds.jsonl
 ```
 
-Design rules:
-
-- **Task registry**: `--task triage` binds prompt builder, gold labels, strict grader, and output
-  contract. Prompt assembly imports `classifier.SYSTEM_PROMPT` / `build_user_message` — never
-  re-typed. The test set stores the *rendered* user message plus structured fields, and a test
-  asserts rendered text == `render_context_text(...)` output.
-- **Backend adapters** (small interface: `load()`, `generate(prompt) -> text, n_out_tokens`).
-  Backend is a recorded variable, not hidden. Decoder LLMs: `llamacpp` (GGUF, serving path) and
-  `mlx`. Encoder/BART: `hf` (PyTorch) and `onnx` (ONNX Runtime, int8) — see §3 for why GGUF may
-  not cover them.
-- **Process isolation**: the parent spawns a *fresh child process per model per phase* and samples
-  child RSS with `psutil` (10 ms) — in-process `ru_maxrss` is avoided (kilobytes on Linux, bytes
-  on macOS, and monotone across phases). Phases: (a) load → `peak_rss_load_mb`, `load_time_s`;
-  (b) first request → `cold_first_request_s`; (c) warm-up 5 requests (discarded); (d) N timed
-  requests → `peak_rss_infer_mb`, latency avg/p50/p95/p99, output tokens, tokens/s. On Apple
-  Silicon also record MLX/Metal peak GPU-buffer memory (RSS under-counts unified memory; verify
-  the exact API name for the installed `mlx` version).
-- **Determinism**: greedy decoding, fixed seed, fixed `--threads`, fixed `max_new_tokens=80`
-  (same as serving). A `--serving-sampling` flag reruns at `temperature=0.2` for the sensitivity
-  check. Stage 1 verifies two runs on the same weights produce identical predictions; if not
-  (thread-count float non-associativity), report the observed tolerance rather than assuming.
-- **Primary device is CPU** (`n_gpu_layers=0` / `device=cpu`), because the production target is a
-  CPU-only Cloud Run service (4 vCPU / 16 GiB, `cloudbuild.yaml`). Metal/MPS runs are secondary,
-  dev-only rows.
-- **Static compute proxies**: parameter count, on-disk size, quantisation scheme/bits, mean prompt
-  tokens, mean generated tokens, and an estimated FLOPs/request (≈ 2 × params × tokens processed)
-  — labelled an estimate. Latency is the primary compute measure.
-- **Outputs**: one JSON row per (model, backend, device, split) plus a per-example predictions
-  file. Environment fingerprint embedded in every row: git SHA, dataset SHA-256s, model file
-  SHA-256, library versions, CPU model, OS, thread count, seed.
+- **Task registry**: `--task hr_query` binds prompt builder, gold labels, strict grader and
+  contract. Prompt assembly imports the canonical render — never re-typed.
+- **Backend adapters** (`load()`, `generate(prompt) -> text, n_out_tokens`). Backend is a recorded
+  variable, not hidden.
+- **Process isolation**: a fresh child process per model per phase; the parent samples child RSS
+  with `psutil` (10 ms); in-process `ru_maxrss` is avoided. Phases: load → first request →
+  5 discarded warm-ups → N timed requests. On Apple Silicon also record MLX/Metal peak memory
+  (RSS under-counts unified memory; verify the API name for the installed `mlx`).
+- **Determinism**: greedy decoding, fixed seed, fixed `--threads`, `max_new_tokens` set from the
+  longest gold output plus margin (replaces triage's 80; this task's output is longer).
+  `--serving-sampling` reruns at the intended serving temperature as a sensitivity check.
+  Stage 1 verifies two runs on the same weights give identical predictions, or reports the
+  observed tolerance.
+- **Primary device is CPU** (`n_gpu_layers=0` / `device=cpu`), because the assumed production
+  target is CPU-only (4 vCPU / 16 GiB). Metal/MPS runs are dev-only secondary rows.
+- **Prompt length is a recorded variable.** Few-shot prompts are much longer than fine-tuned
+  prompts; mean prompt tokens, mean generated tokens and an estimated FLOPs/request
+  (≈ 2 × params × tokens processed, labelled an estimate) go in every row.
+- **Environment fingerprint** in every row: git SHA, dataset and policy-corpus SHA-256s, model
+  file SHA-256, library versions, CPU model, OS, threads, seed.
 
 Row schema (sketch):
 
 ```json
 {
-  "run_id": "...", "task": "triage", "model": "phi35-q4km-baseline", "backend": "llamacpp",
-  "device": "cpu", "threads": 4, "seed": 0, "decoding": "greedy",
-  "env": {"git_sha": "...", "dataset_sha256": "...", "model_sha256": "...", "libs": {}, "cpu": "..."},
+  "run_id": "...", "task": "hr_query", "model": "phi4mini-q4km-baseline", "backend": "llamacpp",
+  "mode": "finetuned", "device": "cpu", "threads": 4, "seed": 0, "decoding": "greedy",
+  "env": {"git_sha": "...", "dataset_sha256": "...", "policy_sha256": "...", "model_sha256": "...", "libs": {}, "cpu": "..."},
   "static": {"params_m": 0, "disk_mb": 0, "quant": "Q4_K_M", "mean_prompt_tokens": 0},
   "memory": {"peak_rss_load_mb": 0, "peak_rss_infer_mb": 0, "metal_peak_mb": null},
   "train": {"total_s": 0, "to_best_ckpt_s": 0, "s_per_step": 0, "samples_per_s": 0,
             "tuning_budget_total_s": 0, "peak_train_mem_mb": 0, "trainable_params_m": 0, "seeds": 3},
   "time": {"load_s": 0, "cold_first_s": 0, "n": 100,
            "avg_s": 0, "p50_s": 0, "p95_s": 0, "p99_s": 0, "tok_per_s": 0},
-  "quality": {"n": 0, "format_pass": 0, "sev_acc": 0, "pass_rate": 0, "macro_f1": 0,
-              "under_triage": 0, "by_meta_category": {}, "ci95": {"pass_rate": [0, 0]}},
+  "quality": {"n": 0, "format_pass": 0, "class_acc": 0, "urgency_acc": 0, "urgency_within1": 0,
+              "resolution_acc": 0, "grounding_clean": 0, "pass_rate": 0,
+              "class_macro_f1": 0, "urgency_qwk": 0, "urgency_qwk_human_ceiling": 0,
+              "critical_misroute": 0, "under_urgency": 0,
+              "by_class": {}, "slice_heldout_clause": {}, "ci95": {"pass_rate": [0, 0]}},
   "setup": {"finetune": {"scores": {}, "median": 0, "raters": 2, "steps": 0, "manual_interventions": 0,
                          "errors_hit": 0, "time_to_first_run_h": 0},
             "serving": {"apple_silicon": {}, "gcp_x86": {}}},
-  "contract": "full | severity_only"
+  "contract": "full | labels_only"
 }
 ```
 
-`pass_rate` = strict format valid **and** severity == gold (one number comparable across
-generative candidates). Encoder candidates report `sev_acc` and `contract: severity_only`.
-
-`backend/eval/compare_rows.py` (small) consumes baseline + candidate rows and per-example preds →
-diff table, paired bootstrap CI, McNemar test, gate verdicts. Comparing candidates is a diff of
-rows, not eyeballing logs.
+`backend/eval/compare_rows.py` consumes baseline + candidate rows and per-example predictions →
+diff table, paired bootstrap CI, McNemar test, gate verdicts.
 
 ---
 
-## 2. Candidates
+## 3. Candidates
 
-| ID | Model | Params | Type | Contract coverage | Training path |
+### 3.1 Model set
+
+| ID | Model | Params | Type | Contract | How it is used |
 |---|---|---|---|---|---|
-| **B0** | Phi-3.5-mini-instruct, LoRA, Q4_K_M GGUF (deployed) | ~3.8B | decoder | full | MLX → fuse → GGUF (existing) |
-| **A** | `bart-base` (optionally `distilbart` variant) | ~140M | encoder-decoder | **full** (generates both lines) | HF Transformers (+PEFT LoRA) |
-| **C** | `distilbert-base-uncased` | ~66M | encoder + class head | severity only | HF Transformers (+PEFT LoRA or full FT) |
-| **C′** | `bert-base-uncased` | ~110M | encoder + class head | severity only | capacity ablation of C (Stage 0 + one run) |
-| **D** (optional, conditional) | a ~1B decoder **whose architecture differs materially from Phi-3.5** (see below) | ~1B | decoder | full | **MLX LoRA → GGUF — identical pipeline to baseline** |
+| **B0** | `microsoft/Phi-4-mini-instruct`, LoRA fine-tuned here, Q4_K_M GGUF | ~3.8B | dense decoder | full | **Newly fine-tuned baseline** (nothing deployed for this task) |
+| **A** | `bart-base` | ~140M | encoder-decoder | full | fine-tuned |
+| **C** | `distilbert-base-uncased` (multi-head classifier) | ~66M | encoder + heads | labels_only | fine-tuned |
+| **C′** | `bert-base-uncased` | ~110M | encoder + heads | labels_only | capacity ablation of C only |
+| **D** (optional) | `google/gemma-3-1b-it`; fallback `LFM2-1.2B` | ~1B | decoder | full | fine-tuned **and** untrained (Stage Z) |
+| **R-big** | Phi-4 (14B) | ~14B | dense decoder | full | **Reference only** (see §3.2); never a deployment candidate |
+| **R-frontier** | one frontier API model | n/a | n/a | full | Quality ceiling, policy in prompt (see §5); resources not comparable |
 
-Recommendation: **finalists A and C** (answers the stated BART/BERT question; A is the only
-small model covering the full contract). Add **D** only if it passes the architecture-difference
-test below. Verify exact model IDs, licences and availability at the start of Stage 0.
+Stage-Z (untrained) rows are added for B0's family and D: Phi-4-mini-instruct zero- and few-shot,
+and D's instruct model zero- and few-shot. BERT/BART have no useful untrained mode (random heads)
+and enter Stage 0 only.
 
-**Candidate D inclusion rule.** D is included only if it is *architecturally* different from the
-baseline, not merely smaller — otherwise the comparison reduces to "same architecture, fewer
-parameters", which adds little. Phi-3.5-mini is a dense, decoder-only, Llama-style transformer
-(multi-head attention, ~32k vocabulary, ~3.8B parameters). A ~1B Llama-3.2 model is *not*
-significantly different in kind: it is the same dense decoder design, differing in size,
-grouped-query attention, vocabulary (~128k) and tied embeddings. So Llama-3.2-1B alone does **not**
-qualify as D.
+### 3.2 Which Phi-4 variant is the baseline
 
-D qualifies if it differs on at least one *structural* axis and still has both an `mlx_lm` LoRA
-path and a llama.cpp/GGUF path (so the pipeline stays identical to the baseline's). Shortlist to
-check against each model's `config.json` and the installed `mlx_lm` / `llama.cpp` support lists
-(from memory, **not yet verified**):
+**Phi-4-mini-instruct**, not the 14B Phi-4. Verified from the model card and `config.json`
+(WebFetch of huggingface.co, this session):
 
-| Option | Structural difference vs Phi-3.5 |
-|---|---|
-| Gemma-3-1B | interleaved local sliding-window / global attention, GQA, very large vocabulary |
-| LFM2-1.2B-class | hybrid gated short-convolution + attention blocks (not a pure transformer) |
-| A Mamba/SSM ~1B model | no attention — state-space recurrence (GGUF support must be confirmed) |
-| Llama-3.2-1B / Qwen-class ~1B | fallback only: same dense design; usable as a *size-only* control, labelled as such |
+- exists as an instruct variant; MIT licence; ~3.8B parameters; 128K context; released
+  February 2025;
+- `architectures: Phi3ForCausalLM`, 32 layers, hidden 3072, **24 attention heads / 8 KV heads**
+  (GQA), **vocab 200,064**, **tied embeddings**, LongRoPE, partial rotary factor 0.75.
 
-If none passes the support check, drop D rather than substitute a same-architecture model under a
-different name. Check licences before publishing derived weights (several of these carry custom
-licences).
+Why not the 14B: at Q4_K_M it needs roughly 8–9 GB for weights alone and would be impractically
+slow on 4 vCPU. A "≥ 2× cheaper" gate against it would be trivially met by almost anything and
+therefore meaningless, and the production shape would have to change. It is kept as **R-big**: one
+Stage-0 resource row (to show the scale argument) and, optionally, a quality reference on Apple
+Silicon. It is not fine-tuned, not gated, not recommended. (If the production target changes to
+GPU or a much larger CPU instance, revisit; recorded as D6.)
 
-Baseline reference rows to run in addition to B0 (cheap, make the paper stronger):
+Tooling facts still **not** confirmed (search results this session were inconclusive):
 
-- **Floor/ceiling controls**: majority class; copy `official_severity_hint` rule; keyword rule;
-  TF-IDF + logistic regression on the same input. If a trivial classifier is within tolerance of
-  B0, that is a central finding.
-- **Quantisation ablation**: B0 as fused FP16/MLX vs Q4_K_M — separates quantisation loss from
-  architecture.
-- **Zero/few-shot base Phi-3.5** (no fine-tune) — shows what fine-tuning buys.
+- `mlx_lm.lora` training on Phi-4-mini-instruct: community GGUF builds exist for llama.cpp, and a
+  third-party MLX LoRA adapter for `mlx-community/Phi-4-mini-instruct-4bit` exists, but neither
+  proves *training* works in the installed `mlx_lm`. Stage 0 step 0 must run a 20-step
+  `mlx_lm.lora` smoke test and a GGUF convert-and-load round trip before anything depends on it.
+- Whether the existing fuse → GGUF → Cloud Run path used for Phi-3.5 works unchanged (200k vocab
+  and tied embeddings change file size and conversion behaviour).
 
-**Tooling caveats to verify in Stage 0 (not yet checked — I could not run any of this in the
-planning environment: no `mlx_lm`, no `llama_cpp`, Linux):**
+### 3.3 Candidate-D architecture rule, re-checked against the new baseline
 
-- `mlx_lm.lora` targets decoder LLMs; BERT/DistilBERT/BART are probably not supported for LoRA
-  there → train A and C with HF Transformers + PEFT (MPS or CPU). Models this small can also be
-  fully fine-tuned; if LoRA is a hard requirement, run LoRA as the primary and full FT as an
-  ablation.
-- `llama.cpp`'s GGUF support for BERT is oriented to embeddings, not classification heads, and
-  BART may not be supported at all. If so, **GGUF + `llama-cpp-python` is not available for A/C**
-  and they serve via ONNX Runtime int8 (or CTranslate2 for BART). Runtime then becomes a
-  confound; report (i) each model on its best supported CPU runtime and (ii) any pair that
-  shares a runtime. Do not claim an architecture effect that is really a runtime effect.
+D must differ from the baseline on at least one *structural* axis, and have both an `mlx_lm` LoRA
+path and a llama.cpp/GGUF path, so the pipeline stays identical to the baseline's.
+
+The new baseline is *closer* to the Llama-3.2 family than Phi-3.5 was: Phi-4-mini now has GQA, a
+large (~200k) vocabulary and tied embeddings — exactly the axes on which the old plan said
+Llama-3.2-1B differed. Consequently:
+
+- **Llama-3.2-1B and Qwen-class ~1B models do not qualify.** They are the same dense decoder
+  design; use only as a labelled **size-only control**, if at all.
+- **Gemma-3-1B still qualifies** (interleaved local sliding-window / global attention is a
+  structural difference; Phi-4-mini's `sliding_window` entry is effectively inactive at 262,144
+  vs 128K context, so it is not a sliding-window model in practice — verify in Stage 0).
+- **LFM2-1.2B-class still qualifies** (hybrid gated short-convolution + attention blocks).
+- A Mamba/SSM ~1B model qualifies architecturally; GGUF/MLX support must be confirmed.
+
+Unverified, to check in Stage 0 before D is included: Gemma-3 and LFM2 `config.json`, `mlx_lm`
+LoRA support for each, llama.cpp/GGUF support for each, and licences (Gemma and LFM2 carry
+custom licences — confirm before publishing any derived weights). If none passes, drop D rather
+than substitute a same-architecture model under another name.
+
+### 3.4 Tooling caveats for BERT/BART (unchanged, still to verify)
+
+- `mlx_lm.lora` targets decoder LLMs → train A and C with HF Transformers (+ PEFT, or full
+  fine-tuning; at this size full FT is feasible — run LoRA as primary if LoRA is required, full FT
+  as an ablation).
+- llama.cpp's BERT support targets embeddings, not classification heads; BART may be unsupported.
+  If so, A and C serve via ONNX Runtime int8 (or CTranslate2 for BART). Runtime becomes a
+  confound: report each model on its best supported runtime *and* any pair sharing a runtime;
+  don't claim an architecture effect that is really a runtime effect.
+
+### 3.5 Controls (cheap, strengthen the paper)
+
+- Majority class; keyword rules per class; **TF-IDF + logistic regression** (three heads) on the
+  rendered input; **class-only → urgency** and **class-only → resolution** rules (quantify how much of these fields is just the class). If a trivial classifier is within tolerance of
+  B0 on the labels, that is a central finding.
+- Quantisation ablation: B0 fused FP16/MLX vs Q4_K_M.
+- A **"summary-copy" control**: output the first sentence of the gold clause as the summary — shows
+  how much of the grounding check a trivial strategy passes.
 
 ---
 
-## 3. Stage 1 — close the harness and test-set gaps *(needed regardless)*
+## 4. Stage 1 — harness, grader, policy corpus and test set *(needed regardless)*
 
-Deliverables, in order:
+Everything in the previous plan's Stage 1 is re-derived for this task:
 
-1. **Pin the training data.** Reconcile `triage_examples.csv` vs `_corrected.csv`; declare one
-   canonical CSV; commit its SHA-256; fix the generator to read it. Re-derive and record which
-   weights correspond to which data (retrain B0 if provenance can't be established).
-2. **Stable, stratified split.** Add a `row_id` (hash of normalised report text); persist
-   `splits.json` (train/valid assignment by row_id, stratified by `meta_category × severity`);
-   generator reads it instead of reshuffling. New rows get assigned once and never move.
-3. **Frozen test set.** `backend/data/triage_test/test.jsonl`:
-   - **Newly authored rows, not carved from the existing 227** (no author-style overlap with
-     train), stratified over the 5 `meta_category` values × 3 severities, with `high` deliberately
-     over-represented (≥ 40 rows) so the safety-critical class is measurable.
-   - **Size**: target 300–360, **floor 150**. (Paired-difference power: with ~15% of items on
-     which two models disagree, a 95% CI half-width of ±4 points needs n ≈ z²·d/h² ≈ 360; n=150
-     gives ≈ ±6 points. Below the floor, results are exploratory only.)
-   - **Authoring (decided, D2)**: candidate rows are *machine-drafted, then human-verified or
-     corrected*. To keep the test set independent and auditable:
-     - Drafts come from a generator that is **not** one of the candidates being evaluated
-       (avoids circularity), using a prompt that is committed to the repo; record generator,
-       prompt version and date per row.
-     - Every row carries `human_action` ∈ {accepted, edited, rejected} and an annotator ID
-       (A1, A2 — IDs only, no personal details in the repo). Rejected rows are kept in an audit
-       file, not silently dropped.
-     - **Anchoring audit**: for at least a third of rows, the annotator assigns severity *before*
-       seeing the drafted label; report agreement between blind label and draft, and Cohen's κ
-       between two annotators on an overlapping subset. A high edit rate on `high` rows is a
-       finding, not a failure.
-     - Labels follow the documented severity-calibration rule; disagreements resolved and logged.
-     - Drafted rows still pass the leakage tests below against train/valid.
-   - **Frozen** by SHA-256 committed in the repo; never used for hyperparameter or checkpoint
-     selection; touched once per final configuration (§5).
-   - Same canonical render path (`context.render_context_text`, `classifier.build_user_message`).
-4. **Leakage tests** (pytest, run in CI): no test `report_text` or full user message in
-   train/valid; max token-Jaccard test→train below a threshold (start 0.6, same as measured
-   today); split assignment unchanged when unrelated rows are appended.
-5. **Strict grader + contract tests**: `backend/eval/grader.py` implementing §0.3's checks, unit
-   tested on a table of good/bad outputs (extra lines, wrong case, `Severity: High`, missing
-   rationale, two sentences, truncation); a test that the strict and lenient parsers agree on
-   every well-formed output.
-6. **Benchmark script + `compare_rows.py`** (§1), with a determinism test (same weights, two
-   runs → identical predictions).
-7. **Reproduce the baseline**: run B0 on the test set → first row. Report its pass rate and
-   format-failure rate honestly; if it already fails format > 1% of the time at temp 0, that
-   changes the interpretation of every comparison.
+1. **Author the policy corpus** (§1.3) with clause IDs; commit its SHA-256.
+2. **Author the training/validation data** as a CSV (`hr_query_examples.csv`): query, gold
+   clause IDs, classification, urgency, resolution, reference summary, `row_id` (hash of
+   normalised query text). CSV-driven, generated to JSONL by a script that uses the canonical
+   render and round-trip validates each row. Pin the CSV by SHA-256.
+3. **Stable, stratified split** (`hr_query_splits.json`): by `row_id`, stratified by
+   `classification × urgency`; persisted, never reshuffled. Lesson carried from the triage audit:
+   a regenerating split and a validation set reused for headline numbers are both invalid.
+4. **Frozen test set** (`backend/data/hr_query_test/test.jsonl`):
+   - Newly authored rows, not carved from the training CSV; stratified over 5 classes × 3
+     urgencies; `high` urgency and `hazard_report` / `complaint` deliberately over-represented
+     (the costly classes) — target ≥ 40 rows in each of those cells combined with ≥ 40 gold-`high`.
+   - Includes the **held-out-clause slice** and the **abstention slice** (§1.3).
+   - **Size**: target 300–400, **floor 150**. The earlier power estimate (≈ 360 rows for ±4
+     points when ≈ 15% of items disagree between two models) was derived for triage; **re-estimate
+     from the pilot disagreement rate on this task** before fixing the target. Size the set for the
+     **primary endpoint family** (§7: classification accuracy and the two safety counts); the
+     secondary endpoints are reported with whatever precision the set gives. Safety counts are
+     small numbers → compared with exact paired tests, so the ≥ 40 rows per costly cell matter more
+     than the total.
+   - **Authoring (D2 carried over)**: machine-drafted, then human-verified/corrected. Drafts come
+     from a generator that is **not** a candidate being evaluated *and not the R-frontier model*
+     (see §5 circularity warning); committed prompt; per-row `generator`, `prompt_version`,
+     date. **Every test row is independently labelled by two annotators (A1, A2; IDs only; D10)**
+     on `classification`, `urgency` and `resolution`, each recording `human_action` ∈ {accepted,
+     edited, rejected} against the draft. Disagreements are adjudicated in a logged step (who,
+     what changed, why); the adjudicated label is gold. Rejected rows kept in an audit file.
+     **Anchoring audit and ceiling**: a random, stratified ≥ ⅓ of rows is labelled **blind**
+     (before seeing the draft) by *both* annotators. Human–human agreement on this blind subset —
+     Cohen's κ for `classification` and `resolution`, QWK for `urgency`, each with bootstrap CI —
+     is the **unanchored ceiling** models are compared against. Agreement on the non-blind rows
+     is reported but flagged as inflated by anchoring. Also report blind-vs-draft agreement.
+   - Frozen by SHA-256; never used for tuning or checkpoint selection; evaluated once per final
+     configuration.
+5. **Leakage tests (pytest, CI)**: no test query/full message in train/valid; max token-Jaccard
+   test→train below threshold (start 0.6); split stable when unrelated rows are appended;
+   held-out-clause slice really has no clause ID present in any train example.
+6. **Strict grader + contract tests** (§1.4) with a table of good/bad outputs: extra lines, wrong
+   case, unknown enum, missing summary, truncated, invented number, number present in the clause,
+   abstention with a figure, `answer_from_policy` on an abstention row, route derivation for each class.
+7. **Benchmark script + `compare_rows.py`** (§2) with the determinism test.
+8. **Reproduce the baseline**: fine-tune B0 once (Phi-4-mini-instruct, smoke-tested per §3.2),
+   run it on the test set → first row. If it fails format > 1% at greedy decoding, that changes the
+   interpretation of every comparison.
 
 *Exit criterion:* baseline row exists, reruns identically, tests green.
 
 ---
 
-## 4. Stage 0 — cheap resource screening *(runs on the benchmark skeleton from Stage 1 item 6)*
+## 5. Stage 0 and Stage Z — resource screen and untrained models
 
-Quality is not measured here. Memory and latency depend on architecture, size, quantisation and
-sequence length, not on trained weights, so untrained / randomly-initialised-head candidates are
-a valid probe. Fine-tuning for a handful of steps is only needed where it changes behaviour that
-affects latency (a generative model's output length) — in that case run ~20–50 LoRA steps so it
-emits the two-line format and generates realistic token counts.
+### Stage 0 — resources only (untrained weights are a valid probe)
 
-Procedure: run the benchmark on B0 and on each of A, C, C′, D with identical settings (CPU,
-4 threads, N=100, real prompts from the validation split, `max_new_tokens=80`), 3 repeats of the
-whole process for run-to-run variance.
+Memory and latency depend on architecture, size, quantisation and sequence length, not on trained
+weights. Run the benchmark on B0, A, C, C′, D, R-big with identical settings (CPU, 4 threads,
+N=100, real validation-split prompts, same `max_new_tokens`), 3 repeats of the whole process.
+Generative candidates get ~20–50 LoRA steps first so they emit the four-line format and
+realistic token counts.
 
-**Decision gate 0 (pre-registered):** a candidate proceeds only if, on CPU, *both*
-`peak_rss_infer_mb` and `p95` latency are **≤ 50% of B0's** (≥ 2× better), with the repeat-to-
-repeat spread smaller than the margin by which it clears the gate. Fail → drop, keep the row in
-the paper as a negative result.
+**Gate 0 (pre-registered):** a candidate proceeds only if, on CPU, both `peak_rss_infer_mb` and
+p95 latency are **≤ 50% of B0's**, with repeat spread smaller than the margin by which it clears.
+Fail → drop, keep the row as a negative result. Expected: encoders clear it trivially, so Gate 0
+mainly screens D and A and confirms magnitudes. Passing earns a fine-tune, nothing more.
 
-Expected caveat to state in the paper: the encoder candidates will almost certainly clear a 2×
-gate trivially (they are 30–60× smaller), so Gate 0 mainly screens the decoder (D) and BART (A)
-and confirms the *magnitude* of the saving rather than discriminating. If a candidate passes Gate
-0 it earns the right to be fine-tuned, nothing more; resource wins never override Gate 1.
+### Stage Z — untrained open instruct models (decision D9: confirmed)
+
+**Why it is worth doing.** It answers a question fine-tuning rows cannot: *is fine-tuning needed
+at all?* If an untrained instruct model with a good prompt is non-inferior to the fine-tuned
+baseline, the cost (data authoring, training, conversion, setup effort) vanishes. It also shows
+what fine-tuning buys, and gives the paper an honest "no training" row.
+
+**Design.**
+
+- Models: Phi-4-mini-instruct and D's instruct model (and optionally one larger open instruct
+  model as a reference, on Apple Silicon only). "Untrained" here means *no task fine-tuning*; it
+  must be the **instruct** variant, since pretrained-only base models do not follow the four-line
+  format and would fail on format, which says nothing about capability. A pretrained-only row may
+  be added as an appendix to show that.
+- Modes: **zero-shot** (system prompt with the contract and policy clause) and **few-shot**
+  (k = 3 and k = 8 examples drawn from *train*, fixed, same for all models, selected before looking
+  at test). Prompt wording is frozen before any test run; allow a bounded, equal number of prompt
+  variants per model, selected on valid, never test.
+- The strict grader is unchanged. Format failures are first-class results: untrained models are
+  expected to fail format more often, and Gate 1's ≥ 99% format rule applies to them too.
+- **Resource rows are not comparable to fine-tuned rows** without care: few-shot prompts are much
+  longer, which raises latency and memory. Record mean prompt tokens, and report resources for
+  untrained models separately and at their actual prompt length.
+- **R-frontier (quality ceiling)** receives the identical rendered input (§1.3). It is reported as
+  a reference, never gated or compared on resources. **Circularity warning:** if the same model
+  drafted the test set (§4 item 4), it will be flattered; draft with one model/vendor and
+  evaluate with another, or label the row as contaminated.
+- Encoders (BERT/DistilBERT) have no untrained quality mode — skip.
+
+Untrained rows enter Gate 1 against B0 like any fine-tuned candidate.
 
 ---
 
-## 5. Stage 2 — fine-tune and compare
+## 6. Stage 2 — fine-tune and compare
 
 **Training protocol (identical across candidates)**
 
-- Same canonical train/valid split; inputs derived from the same rendered user message (decoder:
-  chat messages; BART: source = system+user text, target = the two-line output; encoder: user
-  message → severity label). A conversion function per model family, unit-tested against the
-  canonical render.
-- **Equal tuning budget**: same number of hyperparameter configurations per candidate (e.g. a
-  small grid over learning rate × epochs/steps, ≤ 6 configs), same early-stopping rule, selected on
-  **valid** (loss *and* strict-accuracy), never test.
-- **3 training seeds per candidate** (including B0, retrained under the same protocol so its seed
-  variance is measured; the originally deployed artifact is also reported as-is). Report mean ± sd
-  across seeds. A single run per model is not publishable evidence.
-- **Time to fine-tune is a measured outcome for every model tested** (baseline, A, C, C′, D),
-  recorded by a small wrapper (`backend/eval/train_timer.py`) around each training run so the
-  definition is identical across frameworks:
-  - total wall-clock for one full run (data load excluded, model load/tokeniser setup reported
-    separately);
-  - **time to best validation checkpoint** (wall-clock until the checkpoint that is finally
-    selected), plus time per step/epoch and training samples/s;
-  - total wall-clock of the *whole tuning budget* (all trials × seeds) — the realistic cost of
-    getting a model;
-  - peak training memory, trainable-parameter count, and number of steps/epochs actually used.
-  Report mean ± sd across the 3 seeds. All fine-tuning is timed on the same Apple Silicon machine,
-  idle otherwise, plugged in, same power mode, thermal state noted. **Caveat to state in the
-  paper:** training time also depends on framework (MLX for decoders vs. PyTorch-MPS/CPU for
-  BERT/BART), so it is a pipeline-level cost, not a pure architecture property; the controlled
-  comparison reports it per step on identical sequence lengths and batch size where the frameworks
-  permit. Optionally re-time one run per family on the GCP CPU environment.
-- Class imbalance handling (weights/oversampling) decided once, applied to all, stated.
+- Same canonical train/valid split; inputs from the same rendered user message (including policy
+  clauses). A per-family conversion function (decoder: chat messages; BART: source = system+user
+  text, target = the four-line output; encoder: message → heads) unit-tested against the
+  canonical render. Encoders have a 512-token limit — measure the rendered length distribution
+  first; truncation policy is decided once and stated (do not silently cut the policy clause).
+- **Equal tuning budget**: same number of configurations (≤ 6) per candidate, same early-stopping
+  rule, selected on **valid** (loss *and* strict metrics), never test.
+- **3 training seeds** per candidate including B0; report mean ± sd.
+- **Time to fine-tune is a measured outcome for every model**, via `eval/train_timer.py`:
+  total wall-clock per run, time to the best validation checkpoint, per step/epoch and samples/s,
+  whole-tuning-budget wall-clock, peak training memory, trainable parameters, steps used. All
+  fine-tuning timed on the same idle, plugged-in Apple Silicon machine; thermal state noted.
+  Caveat: training time depends on framework (MLX vs PyTorch-MPS/CPU), so it is a pipeline-level
+  cost, not a pure architecture property.
+- Class imbalance (e.g. `hazard_report`, `high`) handled once, applied to all, stated.
+- **Reduce confounding (per family)**: find each family's *best* fine-tuning recipe (LoRA rank /
+  target layers / lr / steps vs full FT; imbalance handling) and *best* serving architecture
+  (GGUF quant levels, ONNX fp32 vs int8, CTranslate2, PyTorch reference), chosen on valid. Give
+  the baseline the same tuning protocol so it is not the only untuned model. Report two
+  comparisons: each family at its tuned best, and all families under one controlled setting.
 
 **Evaluation protocol**
 
-- The test set is evaluated **once per final (seed × candidate)**, after valid-based selection is
-  frozen. No re-tuning after seeing test numbers; if the protocol must change, the old results
-  stay in the paper's appendix.
-- Metrics: strict format pass rate, severity accuracy, macro-F1, quadratic-weighted κ vs gold,
-  under-triage count, per-`meta_category` breakdown, plus all Stage 0 resource metrics re-measured
-  on the trained artifact.
-- Statistics: Wilson interval for single proportions; **paired** bootstrap CI (10k resamples) and
-  exact McNemar test for candidate vs B0 on the same items; seed variance reported alongside;
-  Holm correction across candidates.
-- Optional secondary: 5-fold CV over the pooled authored data (train+valid+test is *not* allowed
-  to leak into model selection, so only a separate CV on train+valid) to tighten variance if the
-  test set ends near the floor size.
-- Robustness slice (small, mechanical): typo/paraphrase/long-report perturbations of test rows —
-  reports degradation, not a gate.
+- Test set evaluated **once per final (seed × candidate)** after selection is frozen. If the
+  protocol changes, old results stay in the appendix.
+- **Endpoints are declared in advance (D11).** *Primary family*: strict format pass,
+  classification accuracy (non-inferiority), the two safety counts, grounding, and the resource
+  gate. *Secondary (pre-registered)*: urgency QWK (plus exact / within-one / MAE) and
+  `resolution` accuracy. *Descriptive*: joint pass rate, macro-F1, per-class breakdown,
+  held-out-clause and abstention slices, summary mechanical properties.
+- Statistics: Wilson intervals; **paired** bootstrap CI (10k resamples) and exact McNemar vs B0;
+  seed variance alongside; Holm correction across candidates **and across the secondary endpoints**. The primary family is an all-must-pass (intersection) rule, so it needs no alpha split between its members, but each member needs enough power — the sizing driver in §4 item 4.
+- Optional 5-fold CV on train+valid only, to tighten variance if the test set ends near the floor.
+- Robustness slice (small, mechanical): typo/paraphrase/long-query perturbations — degradation
+  reported, not gated.
 
-**Setup-effort evaluation (subjective, structured)**
+**Setup-effort evaluation (subjective, structured; never a gate)** — unchanged in method:
 
-A model that scores well but is painful to fine-tune or serve has a real cost the other metrics
-miss (the baseline's own pipeline notes in `docs/BUILD_PLAN.md` list over a dozen gotchas). This
-is a *subjective* measure, so the plan makes it as structured and auditable as possible rather
-than a free-text impression. It is reported alongside the quantitative results and is **never a
-gate** — it cannot rescue a candidate that fails Gate 0/1, and it is used only to rank candidates
-that are otherwise comparable.
+- Two ratings per model: *fine-tuning setup* and *serving setup* (per environment). For untrained
+  models the fine-tuning rating is "n/a" and the effort is *prompt engineering* (rate that
+  instead).
+- Rubric `backend/eval/setup_rubric.md`, committed before the first candidate: 1–5 on
+  documentation; tooling maturity; manual steps; debugging burden; dependency fragility;
+  reproducibility; portability (Apple Silicon → GCP x86); serving operational complexity.
+- Dated contemporaneous setup logs per model per phase; scores assigned from the log. Objective
+  counters beside the scores (steps, manual interventions, distinct errors, time to first
+  end-to-end run, extra dependencies, glue-code lines, deployable artifact count).
+- ≥ 2 independent raters (IDs only), median/range/disagreement reported. Bias controls:
+  one rater who didn't build the baseline follows its written recipe on a clean machine; fixed
+  setup order; same time-box per candidate, with "not achieved" recorded as a result. Used only to
+  rank candidates that are otherwise comparable.
 
-- **Two separate ratings per model**: *fine-tuning setup* and *serving setup* (serving rated per
-  environment: Apple Silicon and GCP x86 CPU).
-- **Rubric** — each dimension scored 1 (very difficult) to 5 (very easy) with written anchors
-  committed beforehand (`backend/eval/setup_rubric.md`) so scores mean the same thing across
-  models:
-  1. Documentation and examples (does an official, current recipe exist for this task?)
-  2. Tooling maturity and support (is the model/architecture supported out of the box, or does it
-     need patches/workarounds?)
-  3. Number of manual steps (conversion, quantisation, export, glue code)
-  4. Debugging burden (how opaque or time-consuming were the failures hit?)
-  5. Dependency and version fragility (pinning needed, breakage on upgrade)
-  6. Reproducibility (does a clean machine reproduce the result from the written steps?)
-  7. Portability (Apple Silicon → GCP x86 without changes?)
-  8. Operational complexity at serving time (artifact count/size, container build, runtime
-     dependencies, cold-start surprises)
-- **Contemporaneous log, not recollection**: whoever does the work keeps a dated setup log
-  (`results/setup_logs/<model>_<phase>.md`) recording each step, each error and its fix, each
-  workaround, and elapsed time — scores are assigned from the log at the end of the phase.
-- **Objective counters recorded next to the scores** so the subjective rating can be checked:
-  steps in the written recipe, manual interventions, distinct errors hit, **time to first
-  successful end-to-end run** (separate from training time), extra dependencies beyond the
-  baseline's, lines of glue/conversion code, number of deployable artifacts.
-- **Raters**: at least two people score independently from the same log before discussing; report
-  the median and range per dimension, and the disagreement. Rater IDs only (A1, A2), no personal
-  details in the repo.
-- **Bias controls**: (a) the team already knows the baseline pipeline, which flatters it → rate the
-  baseline from its documented gotchas *and* have one rater who did not build it follow the written
-  recipe on a clean machine; (b) fix the order in which candidates are set up and note it (later
-  ones benefit from experience gained earlier); (c) give every candidate the same time-box for
-  getting a first working run, and record "not achieved within time-box" as a result, not a
-  missing value.
-- Reported as a compact table and radar/heat-map in the paper, clearly labelled subjective, with
-  the rubric and logs in the reproducibility package.
+---
 
-**Pre-registered decision rules (Gate 1)** — all must hold for a candidate to be recommended:
+## 7. Pre-registered decision rules (Gate 1)
+
+All must hold for a candidate to be recommended. **Numbers are carried over from the triage plan
+as a proposal (D3); the justification must be re-argued for this task and the values frozen in
+`gates.yaml` before any Stage 2 run.**
+
+**Primary family — all must hold to recommend (frozen in `gates.yaml`):**
 
 | Criterion | Rule |
 |---|---|
 | Format validity (full-contract candidates) | strict format pass ≥ 99% on test at greedy decoding |
-| Accuracy, non-inferiority | paired-bootstrap 95% CI lower bound of (candidate − B0) severity accuracy **> −5 points** |
-| Safety | under-triage (gold `high` → not `high`) count **not higher than B0's** on the test set; any increase triggers manual review of those rows regardless of aggregate score |
-| Resource | still ≥ 2× on memory and p95 latency after fine-tuning |
+| Classification, non-inferiority | paired-bootstrap 95% CI lower bound of (candidate − B0) `classification` accuracy **> −5 points** |
+| Grounding (full-contract only) | grounding-clean rate not lower than B0's by more than the margin, **and** invented figures on the abstention slice not above B0's count |
+| Safety 1 — critical misroute | count of gold `hazard_report` or `complaint` predicted as `leave_policy` or `hiring_request` **not higher than B0's** (exact paired test; any increase → manual row review) |
+| Safety 2 — under-urgency | count of gold `high` urgency predicted not-`high` **not higher than B0's** (same procedure) |
+| Resource | still ≥ 2× on memory and p95 latency after fine-tuning (untrained models: at their real prompt length) |
 
-Three-way outcome, stated up front to handle small-n noise: **non-inferior** (CI lower bound >
-−5), **inferior** (CI upper bound < 0 *and* point estimate ≤ −5), otherwise **inconclusive** →
-enlarge the test set (or add CV) and re-run; do not call an inconclusive result a win or a loss.
-The 5-point margin and the 2× gate are decided (D3, §8) and explained in §9; they are frozen
-by commit before Stage 2 starts.
+**Secondary endpoints — pre-registered, reported with Holm-corrected CIs, do not gate on their own:**
 
----
+| Endpoint | Non-inferiority reference |
+|---|---|
+| Urgency QWK | CI lower bound of (candidate − B0) QWK **> −δ_u**, where **δ_u = half-width of the 95% bootstrap CI of the human–human QWK on the blind pilot subset**, rounded down to 0.01, floored at 0.02 (D3′). Model QWK is always shown against the human–human ceiling; a model at or above the ceiling is *saturated*, and further differences are not interpretable |
+| `resolution` accuracy | same −5-point rule as classification |
 
-## 6. Stage 3 — production-representative validation
+A candidate found **inferior** on a secondary endpoint is still recommendable on the primary
+family, but the verdict must state the inferiority as a caveat — the recommendation text cannot
+omit it. Within-one urgency and MAE are descriptive.
 
-Dev-machine numbers (Apple Silicon, possibly Metal) are a *relative* signal. Before any
-migration recommendation:
+Any increase on a safety count triggers manual review of those rows regardless of aggregate score.
+Three-way outcome: **non-inferior** (CI lower bound > −5), **inferior** (CI upper bound < 0 *and*
+point estimate ≤ −5), otherwise **inconclusive** → enlarge test set / add CV and re-run; never call
+inconclusive a win or loss.
 
-1. **Run the same benchmark script inside the production container image** on x86-64 Linux CPU
-   (Cloud Build / a small GCE VM / a Cloud Run job — not an arm64 Mac running Docker under
-   emulation, which would distort latency). Same vCPU count and memory limit as
-   `cloudbuild.yaml` (4 vCPU / 16 GiB), and additionally the smaller footprint the candidate
-   would permit (e.g. 2 vCPU / 4 GiB — the point of the exercise; note the baseline's history of
-   OOM-kills at 4 GiB).
-2. **Check the ratios, not the absolutes**: do the dev-machine candidate/B0 memory and latency
-   ratios hold on the production target (≥ 2×)? Report the dev-vs-prod drift in the paper.
-3. **Real cold start**: with `min-instances=0`, measure container start → first triaged event
-   through the real HTTP path (`POST /events/community-report` → poll `GET /events`), baseline
-   vs candidate. Also record Cloud Run's reported memory utilisation and billable time.
-4. **End-to-end contract smoke test**: point the dashboard at the candidate-backed service
-   (headless browser against a seeded report set) and assert severity pills, filter counts, map
-   cluster colouring and rationale display behave identically to B0 — closes the loop on §0.3,
-   including the severity-only variant if C is a finalist.
-5. Only then write the migration recommendation (or the "do not migrate" conclusion).
+Rationale to re-argue for this task (carry reasoning into the methods section):
 
----
-
-## 7. Paper structure and validity
-
-Outline: (1) motivation — small models for emergency-information triage; (2) task and output
-contract; (3) dataset construction and the held-out protocol; (4) candidates and training
-protocol; (5) benchmark methodology (memory/time/compute/quality, process isolation, determinism);
-(6) results — resource table, quality table, Pareto plot (pass rate vs p95 latency vs peak RSS),
-safety/under-triage analysis, dev-vs-prod validation; (7) threats to validity; (8) reproducibility
-package.
-
-Threats to validity to state plainly:
-
-- Fully synthetic, small, single-team-authored data → in-distribution, may not transfer to real
-  public reports; the test set mitigates author overlap but not synthetic-ness.
-- Label subjectivity (severity); κ reported.
-- The setup-effort measure is subjective, depends on the rater's prior familiarity, and on a single team's tooling experience (§5 bias controls); it is reported as supporting evidence only.
-- Runtime/quantisation confounds across model families (§2 caveats).
-- Test-set size limits resolvable effect sizes (§3 item 3).
-- Hazard-planning data, not live emergency information: results say nothing about fitness for
-  real emergency use; in an emergency, 111 (project ground rule).
-
-Reproducibility package: pinned dependency lockfiles, container image digest, dataset hashes and
-split file, benchmark script + raw rows + per-example predictions, seeds, hardware fingerprint,
-and model-card/licence notes. Repo hygiene per `CLAUDE.md`: no participant names or contact
-details in any artifact; no references to the OIA validation project; check licence terms of the
-five official data sources before publishing anything derived from them; confirm base-model
-licences before releasing fine-tuned weights.
+- **5-point margin (classification, `resolution`)**: the largest loss accepted in exchange for the
+  saving. For a routing aid whose output a human reviews it is tolerable; classification is the
+  least subjective, most checkable label, which is why it carries the primary endpoint. Must stay
+  no tighter than the test set's resolvable noise (re-derive from pilot data, §4 item 4).
+- **Urgency margin from the data, not by fiat**: a margin smaller than the labels' own noise
+  cannot be verified, and a larger one is arbitrary. Anchoring δ_u to the human–human CI
+  half-width states exactly "we cannot distinguish differences smaller than what two humans
+  disagree by". It is computed from the pilot blind subset and frozen before Stage 2.
+- **Why urgency and `resolution` are secondary**: the primary family already contains an
+  all-must-pass rule; adding noisy, correlated fields as gates would shrink power and encourage
+  selecting margins after the fact. Declaring the hierarchy in advance, with caveats mandatory,
+  keeps the paper honest without making the recommendation hostage to label noise.
+- **2× resource gate**: unchanged reasoning — below ~2× is inside run-to-run and dev-vs-prod drift
+  and would not change which instance size is viable; both memory and latency must pass.
+- The safety rules replace the triage "under-triage" rule; they are stated as counts relative to
+  B0 because average accuracy can hide a worse miss rate on the costly cells.
 
 ---
 
-## 8. Decisions
+## 8. Stage 3 — production-representative validation
+
+1. Run the benchmark inside a container on **x86-64 Linux CPU** (Cloud Build / small GCE VM /
+   Cloud Run job — not an arm64 Mac under emulation) at 4 vCPU / 16 GiB, and at the smaller shape
+   the candidate would permit (e.g. 2 vCPU / 4 GiB; the old Phi-3.5 pipeline hit OOM-kills at
+   4 GiB, and Phi-4-mini's 200k vocabulary makes the embedding/output matrix larger — measure, don't
+   assume).
+2. Check ratios, not absolutes: do dev-machine candidate/B0 ratios hold (≥ 2×)? Report drift.
+3. Real cold start (`min-instances=0`): container start → first handled request through an HTTP
+   endpoint, baseline vs candidate; record memory utilisation and billable time.
+4. End-to-end contract smoke test: a thin HTTP endpoint wrapping the model, driven by a seeded
+   query set; assert the four fields parse, enums are valid, and the labels-only variant behaves
+   (summary `null`). (No dashboard exists for this stand-in task, so this replaces the triage
+   dashboard smoke test.)
+5. Only then write the recommendation, or the "do not migrate" conclusion.
+
+---
+
+## 9. Paper structure and validity
+
+Outline: (1) motivation — small models for routing-and-reply tasks; (2) task and output contract
+(policy-in-prompt design); (3) dataset construction and held-out protocol; (4) candidates, controls
+and the untrained arm; (5) benchmark methodology; (6) results — resource table, quality table,
+Pareto plot (pass rate vs p95 vs peak RSS), safety analysis, untrained-vs-fine-tuned, dev-vs-prod;
+(7) threats to validity; (8) reproducibility package.
+
+Threats to validity:
+
+- Fully synthetic, small, single-team-authored data, and a stand-in task: results show the method
+  and in-distribution behaviour, not fitness for real HR use or any real policy.
+- Policy retrieval is given, not tested; real systems also err in retrieval.
+- Label subjectivity (urgency especially) — κ reported separately per field.
+- Machine-drafted test labels and the R-frontier circularity (§5) if not separated.
+- Setup-effort score is subjective and familiarity-dependent; supporting evidence only.
+- Runtime/quantisation confounds across families (§3.4); few-shot prompt-length confound (§5).
+- Test-set size limits resolvable effect sizes.
+- Not legal or HR advice; the synthetic policy is invented and says nothing about real entitlements.
+
+Reproducibility package: lockfiles, container digest, dataset and policy-corpus hashes, split file,
+benchmark script, raw rows and per-example predictions, seeds, hardware fingerprint, model-card and
+licence notes (Phi-4-mini: MIT, confirmed; Gemma / LFM2 custom licences: confirm). Repo hygiene per
+`CLAUDE.md`: no participant names or contact details; no references to the internal validation
+project; confirm base-model licences before releasing weights.
+
+---
+
+## 10. Decisions
 
 | # | Decision | Status |
 |---|---|---|
-| D1 | Severity-only candidates (no rationale) | **Decided: acceptable** — severity is the main output. Encoder candidates are scored on the severity-only contract; the paper states the contract delta. Still to settle in implementation: `rationale` = `null` vs. a deterministic template (default `null`; the dashboard already hides a missing rationale) |
-| D2 | Test-set authoring | **Decided:** machine-drafted candidate rows, human-verified/corrected (protocol in §3 item 3) |
-| D3 | Accuracy tolerance and resource gate | **Decided:** 5-point non-inferiority margin; 2× gate (explained in §9) |
-| D4 | Candidate D (~1B decoder) | **Decided: optional, conditional** on being architecturally different from Phi-3.5 (§2) |
-| D5 | Environments | **Decided:** every candidate (and the baseline) runs on **Apple Silicon** (dev) and then on **GCP x86-64 CPU** (production-like, Stage 3). Note Apple Silicon is macOS (Darwin/arm64), not Linux — it is a dev proxy for Linux-style tooling, not the same OS or ISA as Cloud Run, which is exactly why Stage 3 exists. Fine-tuning and its timing happen on Apple Silicon only (see §5) |
+| D1 | Candidates that cannot generate text | **Decided (generalised):** labels-only contract for encoders; `summary = null` |
+| D2 | Test-set authoring | **Decided:** machine-drafted, human-verified, blind-label anchoring audit; drafter ≠ any evaluated model (≠ R-frontier) |
+| D3 | 5-point margin and 2× gate | **Carried over as proposal; re-argue for this task and freeze in `gates.yaml`** (see D3′) |
+| D3′ | Urgency margin | **Decided (this revision):** QWK endpoint; δ_u from the human–human QWK CI on the blind pilot subset (§7); ceiling always shown. Numeric value frozen in `gates.yaml` after the pilot |
+| D4 | Optional ~1B decoder must differ structurally from baseline | **Decided; re-checked** against Phi-4-mini (§3.3): Llama-3.2/Qwen ~1B no longer qualify |
+| D5 | Environments | **Decided:** Apple Silicon (dev + fine-tuning timing), then GCP x86-64 CPU (Stage 3) |
+| D6 | Baseline | **Decided:** Phi-4-mini-instruct, newly fine-tuned; Phi-4 14B reference-only. Revisit if the target moves off 4 vCPU CPU |
+| D7 | Policy handling | **Decided:** policy text in the input for all models (option 1); retrieval given |
+| D8 | `next_step` design | **Decided (this revision):** model emits `resolution` ∈ {answer_from_policy, escalate_to_human, ask_clarification}; destination queue derived in code from `classification` (§1.1). Avoids a redundant label that would double-count class errors |
+| D9 | Untrained models | **Decided:** include Stage Z with instruct variants, zero/few-shot, plus a frontier reference |
+| D10 | Test annotation | **Decided (this revision):** two independent annotators on every test row, logged adjudication; ≥ ⅓ blind subset labelled by both gives the unanchored human–human ceiling (§4 item 4) |
+| D11 | Endpoints | **Decided (this revision):** primary family = format, classification accuracy, two safety counts, grounding, resource gate; secondary = urgency QWK, `resolution` accuracy; joint pass rate descriptive only (§6, §7) |
 
-## 9. Todos
+---
 
-Rationale for the two frozen thresholds (include this reasoning in the paper's methods section):
+## 11. Todos
 
-- **5-point accuracy margin (non-inferiority).** We are not trying to prove the candidate is
-  *better*; we are asking whether it is *not meaningfully worse* while being much cheaper. The
-  margin is the largest accuracy loss we would accept in exchange for the resource saving. 5
-  points is chosen because (a) the output is a triage aid that a staff member reviews, not an
-  autonomous decision, so a small regression is tolerable; (b) the test set is small enough
-  (~150–360 rows) that its sampling noise is already ±4–6 points, so a tighter margin could not be
-  verified and would produce mostly "inconclusive" results; (c) severity labels are subjective,
-  so differences below this are within plausible annotator disagreement. The rule uses the
-  *lower bound of the paired 95% CI*, not the point estimate, so noise cannot rescue a candidate.
-  It is paired with a separate safety rule (no extra gold-`high` → not-`high` errors) because
-  average accuracy can hide a worse miss rate on the costly class.
-- **2× resource gate.** A migration has fixed costs (a new training/serving path, ONNX or other
-  runtime, re-validation, maintenance). A gain under ~2× would be inside the run-to-run and
-  dev-vs-production measurement drift we expect and would not change which Cloud Run instance
-  size is viable; ≥ 2× on *both* peak memory and p95 latency is a conservative threshold at which
-  the saving is real, survives the Stage 3 environment change, and can plausibly justify a smaller
-  instance. Both metrics must pass so a candidate cannot win on memory while being slower.
+**Verify first (Stage 0, step 0)** — none of this has been checked in this repo yet
+- [ ] `mlx_lm.lora` 20-step smoke test on Phi-4-mini-instruct; GGUF convert → Q4_K_M → load round trip; confirm existing Cloud Build/Docker path still works with the 200k vocab
+- [ ] Confirm `config.json`, `mlx_lm` LoRA and llama.cpp/GGUF support for Gemma-3-1B-it and LFM2-1.2B; licences
+- [ ] Confirm BART / BERT support in `mlx_lm` LoRA and llama.cpp GGUF; choose serving runtimes (ONNX int8 / CTranslate2)
 
-Checklist (tick as done):
-
-**Stage 1 — gaps**
-- [ ] Reconcile `triage_examples.csv` vs `_corrected.csv`; pin one canonical CSV by SHA-256; fix the generator
-- [ ] Persist a stable, stratified split (`row_id`, `triage_splits.json`)
-- [ ] Draft test-set rows with a non-candidate generator (committed prompt); record provenance per row
-- [ ] Human verify/correct drafts; blind-label ≥ ⅓ for the anchoring audit; second annotator on an overlap subset; report κ
-- [ ] Freeze the test set (SHA-256 committed); reach ≥ 150 rows, target 300–360, ≥ 40 `high`
-- [ ] Leakage tests (exact, near-duplicate, split stability) in CI
-- [ ] Strict grader + contract tests (strict vs. lenient parser agreement)
+**Stage 1**
+- [ ] Write the label rules: precedence, `other_unclear`, urgency calibration, class→route table (`routing_table.yaml`), `resolution` gold rule
+- [ ] Author the policy corpus (clause IDs, SHA-256) and `hr_query_examples.csv`
+- [ ] Canonical render function; generator script with round-trip validation
+- [ ] Persist stable stratified split
+- [ ] Draft test rows with a non-candidate, non-R-frontier generator; human verify; two annotators on every row; adjudication log; blind ≥ ⅓ subset labelled by both; κ / QWK with CIs per field
+- [ ] Held-out-clause and abstention slices; freeze test (SHA-256); ≥ 150 rows, target set from pilot disagreement rate
+- [ ] Leakage tests in CI (incl. clause-ID holdout)
+- [ ] Strict grader incl. grounding check + contract tests
 - [ ] `benchmark_model.py`, `compare_rows.py`, determinism test
-- [ ] Reproduce the baseline row (and the quantisation, zero-shot and trivial-classifier controls)
-- [ ] Commit `gates.yaml` with the 5-point margin and 2× gate **before** any Stage 2 run
+- [ ] Fine-tune and reproduce the B0 row; add controls (trivial, summary-copy, quantisation)
+- [ ] Pilot annotation → compute human–human QWK CI → fix δ_u; commit `gates.yaml` **before** any Stage 2 run
 
-**Stage 0 — screening**
-- [ ] Verify tooling caveats (§2): BERT/BART support in `mlx_lm` LoRA and in llama.cpp GGUF; pick serving runtimes
-- [ ] Benchmark B0, A, C, C′ (and D if it qualifies) on CPU, 3 repeats; apply the 2× gate
+**Stage 0 / Stage Z**
+- [ ] Benchmark B0, A, C, C′, D, R-big (resource only), 3 repeats; apply Gate 0
+- [ ] Freeze prompts; choose few-shot examples from train; run Phi-4-mini-instruct and D zero/few-shot (k = 3, 8) on test
+- [ ] R-frontier reference run with identical rendered input (different model from the drafter)
 
-**Reduce confounding factors (per model family)**
-- [ ] For each family, find its *best* fine-tuning recipe and its *best* serving architecture instead of reusing the baseline's settings, so differences reflect the models rather than a recipe tuned for Phi-3.5:
-  - Fine-tuning: LoRA (rank, target layers, learning rate, steps) vs. full fine-tuning for the small encoders/BART; class-imbalance handling; max sequence length / truncation policy for the 512-token encoders.
-  - Serving: for each family, compare runtimes and precisions (e.g. GGUF quant levels, ONNX Runtime fp32 vs. int8, CTranslate2 for BART, PyTorch as reference) and pick the best accuracy/resource trade-off *using valid, not test*.
-- [ ] Give every family the same tuning *budget* (equal number of trials), with a family-specific search space; record every trial
-- [ ] Report two comparisons: each family at its tuned best (what you would deploy) and all families under one controlled setting (same runtime where possible, same threads, same prompt length) — and state which differences are runtime-, precision- or architecture-driven
-- [ ] Run the baseline through the same tuning protocol (LoRA settings, Q4_K_M vs. higher-precision quants) so it is not the only untuned model in the table
+**Reduce confounding**
+- [ ] Per-family best recipe and best serving architecture, chosen on valid; equal tuning budget; baseline gets the same protocol
+- [ ] Report both tuned-best and controlled-setting comparisons
 
-**Setup-effort evaluation**
-- [ ] Write and commit `setup_rubric.md` (8 dimensions, 1–5 anchors) before the first candidate is set up
-- [ ] Start a dated setup log per model per phase (fine-tuning; serving on Apple Silicon; serving on GCP); record steps, errors, workarounds, elapsed time, time to first end-to-end run
-- [ ] Fix the setup order and a per-candidate time-box for a first working run; record time-box failures explicitly
-- [ ] Two independent raters score from the logs; report median, range and disagreement
-- [ ] Have one rater who did not build the baseline pipeline follow its written recipe on a clean machine, to offset familiarity bias
-- [ ] Add the `setup` block to the result rows and a labelled-subjective table to the paper
+**Setup-effort**
+- [ ] `setup_rubric.md` before first setup; dated logs; fixed order and time-box; two raters; clean-machine rater for baseline; `setup` block in rows
 
 **Stage 2 / 3 / paper**
-- [ ] Fine-tune A, C (and C′, D if included) and re-train the baseline, 3 seeds each, timing every run with `train_timer.py` (total, time-to-best-checkpoint, per-step, peak memory, whole-tuning-budget time); single test-set pass per final config
-- [ ] Gate 1 verdicts: non-inferior / inferior / inconclusive; Holm-corrected
-- [ ] Stage 3 production-class validation and dashboard smoke test (both full and severity-only contracts)
-- [ ] Provision the GCP x86-64 CPU environment (matching the Cloud Run 4 vCPU / 16 GiB shape) and rerun the full benchmark there for every candidate; confirm model and data licences before releasing any weights
-- [ ] Draft the paper (§7 outline) and the reproducibility package
+- [ ] Fine-tune A, C (C′, D if included) and re-train B0, 3 seeds each with `train_timer.py`; single test pass per final config
+- [ ] Gate 1 verdicts (non-inferior / inferior / inconclusive), Holm-corrected
+- [ ] Provision GCP x86-64 CPU (4 vCPU / 16 GiB and the smaller shape); rerun everything; Stage 3 checks
+- [ ] Confirm model and data licences before releasing weights
+- [ ] Draft the paper (§9) and reproducibility package
 
-## 10. Files this plan will add (none exist yet)
+## 12. Files this plan will add (none exist yet)
 
 ```
 backend/eval/benchmark_model.py   backend/eval/grader.py     backend/eval/compare_rows.py
-backend/eval/train_timer.py   backend/eval/setup_rubric.md   results/setup_logs/
-backend/eval/backends/            backend/eval/gates.yaml    backend/tests/test_eval_*.py
-backend/data/triage_splits.json   backend/data/triage_test/test.jsonl   backend/data/triage_test.csv
-backend/scripts/train_hf_candidate.py   results/  (rows + predictions, committed)
+backend/eval/train_timer.py       backend/eval/setup_rubric.md   backend/eval/gates.yaml
+backend/eval/routing_table.yaml  backend/eval/backends/   backend/tests/test_eval_*.py   results/ (rows, predictions, setup_logs/)
+backend/data/hr_policy_corpus.json   backend/data/hr_query_examples.csv   backend/data/hr_query_splits.json
+backend/data/hr_query_test/test.jsonl   backend/data/hr_query_test.csv
+backend/scripts/generate_hr_query_dataset.py   backend/scripts/train_hf_candidate.py
 ```
