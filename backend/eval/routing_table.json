@@ -1,0 +1,8 @@
+{
+  "_note": "Destination queue is derived from classification in code, never model output (docs/paper_plan.md 1.1). Queue names are provisional.",
+  "leave_policy": "hr_services",
+  "complaint": "employee_relations",
+  "hazard_report": "health_safety",
+  "hiring_request": "recruitment",
+  "other_unclear": "hr_triage"
+}

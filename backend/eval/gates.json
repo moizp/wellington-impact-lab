@@ -1,0 +1,11 @@
+{
+  "frozen": false,
+  "_note": "PROPOSED values from docs/paper_plan.md section 7. Not pre-registered until frozen=true is committed BEFORE any Stage 2 result exists. Until then every verdict is labelled EXPLORATORY.",
+  "format_min": 0.99,
+  "classification_margin": 0.05,
+  "resolution_margin": 0.05,
+  "urgency_qwk_margin": null,
+  "urgency_qwk_margin_note": "delta_u comes from the human-human QWK CI on the blind pilot subset (D3'); left null until the pilot exists",
+  "bootstrap_resamples": 10000,
+  "seed": 0
+}

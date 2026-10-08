@@ -1,0 +1,19 @@
+{
+  "data": "fixtures/test_fixture.jsonl",
+  "policy": "fixtures/policy_fixture.json",
+  "train": "fixtures/train_fixture.jsonl",
+  "baseline": "keyword-control",
+  "runs": [
+    {"name": "majority-control", "backend": "controls:majority"},
+    {"name": "keyword-control", "backend": "controls:keyword"},
+    {"name": "oracle-sanity", "backend": "controls:oracle", "allow_gold": true},
+
+    {"name": "b0-phi4mini-q4km", "backend": "llamacpp:models/phi4mini-q4km.gguf", "enabled": false},
+    {"name": "d-lfm2-q4km", "backend": "llamacpp:models/lfm2-1.2b-q4km.gguf", "enabled": false},
+    {"name": "phi4mini-zeroshot", "backend": "llamacpp:models/phi4mini-instruct-q4km.gguf", "k_shots": 0, "enabled": false},
+    {"name": "phi4mini-3shot", "backend": "llamacpp:models/phi4mini-instruct-q4km.gguf", "k_shots": 3, "enabled": false},
+    {"name": "lfm2-3shot", "backend": "llamacpp:models/lfm2-1.2b-instruct-q4km.gguf", "k_shots": 3, "enabled": false},
+    {"name": "opus-zeroshot", "backend": "anthropic:claude-opus-5-5", "k_shots": 0, "enabled": false},
+    {"name": "opus-3shot", "backend": "anthropic:claude-opus-5-5", "k_shots": 3, "enabled": false}
+  ]
+}
