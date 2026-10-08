@@ -63,7 +63,7 @@ answered with a recommended reply and routing:
   covers the question and whether a human must act.
 - **`summary`**: a one-to-two-sentence recommended response / case summary.
 - **Destination queue (`route`) is not a model output.** It is derived in code from
-  `classification` via a committed table (`eval/routing_table.yaml`; queue names provisional:
+  `classification` via a committed table (`eval/routing_table.json`; queue names provisional:
   `leave_policy`→hr_services, `complaint`→employee_relations, `hazard_report`→health_safety,
   `hiring_request`→recruitment, `other_unclear`→hr_triage) — the same "deterministic vs
   model-inferred" split the Wellington system applies to `hazard_type`. The user-facing "next
@@ -135,7 +135,7 @@ The strict grader (`eval/grader.py`; rejects, never defaults) checks:
    (truncation = fail).
 2. **Semantic**: `classification`, `urgency` and `resolution` equal gold; urgency also scored ordinally (QWK, within-one).
 3. **Route derivation**: the code-derived `route` for the predicted class is computed through
-   the same `routing_table.yaml` used for gold labels; a test asserts a gold row's route equals
+   the same `routing_table.json` used for gold labels; a test asserts a gold row's route equals
    the table's output. A critical misroute (§7) is a *class* error visible through this table.
 4. **Grounding (mechanical)**: every number/duration/date token in `summary` also appears in the
    supplied clause text; on abstention examples the summary contains none. A wrong figure is a
@@ -166,7 +166,7 @@ baseline:
 ```bash
 python -m eval.benchmark_model \
   --task hr_query --model <path-or-hf-id> \
-  --backend {llamacpp,mlx,hf,onnx,ctranslate2} \
+  --backend {llamacpp,mlx,hf,onnx,ctranslate2,anthropic} \
   --mode {finetuned,zeroshot,fewshot} --k-shots 0 \
   --split {test,valid} --n-runs 100 --threads 4 --device cpu \
   --out results/<run_id>.json --preds-out results/<run_id>.preds.jsonl
@@ -218,6 +218,22 @@ Row schema (sketch):
 }
 ```
 
+**What exists today (harness v0, stdlib-only, 39 unit tests passing).** `backend/eval/`: `contract.py`
+(enums, system prompt, canonical render, `format_output`), `grader.py` (strict parse, grounding,
+safety flags), `metrics.py`, `stats.py` (Wilson, QWK, paired bootstrap, exact McNemar),
+`runner.py` / `run_eval.py` (one backend → result row + per-example predictions),
+`run_suite.py` (all enabled models, one at a time → `summary.md` + paired comparison),
+`compare_rows.py`, `gates.json` (**`frozen: false`**, so every verdict prints as EXPLORATORY),
+three controls (`oracle`, `keyword`, `majority`), and thin adapters for llama.cpp, MLX and the
+Anthropic API that are **written but untested** (they need model files, weights or an API key).
+`hf` / `onnx` / `ctranslate2` adapters for BART and DistilBERT are not implemented. The data under
+`eval/fixtures/` is an invented 24-row fixture for testing the harness, **not** the benchmark.
+This is the quality half only: the isolated memory / latency benchmark (`benchmark_model.py`) is
+still to build and will wrap `runner.run`.
+
+Run it: `cd backend && python3 -m unittest discover -s tests -t . -p "test_eval_*.py"` and
+`python3 -m eval.run_suite`.
+
 `backend/eval/compare_rows.py` consumes baseline + candidate rows and per-example predictions →
 diff table, paired bootstrap CI, McNemar test, gate verdicts.
 
@@ -230,16 +246,20 @@ diff table, paired bootstrap CI, McNemar test, gate verdicts.
 | ID | Model | Params | Type | Contract | How it is used |
 |---|---|---|---|---|---|
 | **B0** | `microsoft/Phi-4-mini-instruct`, LoRA fine-tuned here, Q4_K_M GGUF | ~3.8B | dense decoder | full | **Newly fine-tuned baseline** (nothing deployed for this task) |
-| **A** | `bart-base` | ~140M | encoder-decoder | full | fine-tuned |
-| **C** | `distilbert-base-uncased` (multi-head classifier) | ~66M | encoder + heads | labels_only | fine-tuned |
-| **C′** | `bert-base-uncased` | ~110M | encoder + heads | labels_only | capacity ablation of C only |
-| **D** (optional) | `google/gemma-3-1b-it`; fallback `LFM2-1.2B` | ~1B | decoder | full | fine-tuned **and** untrained (Stage Z) |
-| **R-big** | Phi-4 (14B) | ~14B | dense decoder | full | **Reference only** (see §3.2); never a deployment candidate |
-| **R-frontier** | one frontier API model | n/a | n/a | full | Quality ceiling, policy in prompt (see §5); resources not comparable |
+| **A** | `facebook/bart-base` | ~139M | encoder-decoder | full | fine-tuned |
+| **C** | `distilbert/distilbert-base-uncased` (multi-head classifier) | ~66M | encoder + heads | labels_only | fine-tuned |
+| **D** | `LiquidAI/LFM2-1.2B` (fallback: `google/gemma-3-1b-it`) | 1.17B | hybrid conv + attention decoder | full | fine-tuned **and** untrained (Stage Z); decided D12 |
+| **R-frontier** | Anthropic **Claude Opus 5.5** (`claude-opus-5-5`), via API | not disclosed | hosted | full | Quality reference, zero- and few-shot, policy in prompt (§5.1); cost and latency reported separately, not gated |
 
 Stage-Z (untrained) rows are added for B0's family and D: Phi-4-mini-instruct zero- and few-shot,
-and D's instruct model zero- and few-shot. BERT/BART have no useful untrained mode (random heads)
-and enter Stage 0 only.
+and LFM2-1.2B zero- and few-shot. BERT/BART have no useful untrained mode (random heads) and
+enter Stage 0 only.
+
+**Dropped models (D13).** `google-bert/bert-base-uncased` (the capacity ablation) and
+`microsoft/phi-4` (the 14B reference) are removed. Consequences to state in the paper: the encoder
+family is represented by DistilBERT alone, so there is no encoder capacity-scaling result; and the
+"too big for 4 vCPU" argument for choosing Phi-4-mini over Phi-4 is reasoning (a Q4_K_M 14B
+needs roughly 8–9 GB for weights alone), not a measured row.
 
 ### 3.2 Which Phi-4 variant is the baseline
 
@@ -253,17 +273,18 @@ and enter Stage 0 only.
 
 Why not the 14B: at Q4_K_M it needs roughly 8–9 GB for weights alone and would be impractically
 slow on 4 vCPU. A "≥ 2× cheaper" gate against it would be trivially met by almost anything and
-therefore meaningless, and the production shape would have to change. It is kept as **R-big**: one
-Stage-0 resource row (to show the scale argument) and, optionally, a quality reference on Apple
-Silicon. It is not fine-tuned, not gated, not recommended. (If the production target changes to
-GPU or a much larger CPU instance, revisit; recorded as D6.)
+therefore meaningless, and the production shape would have to change. It is **not run**
+(D13); the argument is stated, not measured. (If the production target changes to GPU or a much
+larger CPU instance, revisit; recorded as D6.)
 
-Tooling facts still **not** confirmed (search results this session were inconclusive):
+Tooling, checked against the upstream source this session (GitHub, not an installed copy):
+`mlx_lm` has `phi3.py` handling LongRoPE, `partial_rotary_factor` and tied embeddings, and its LoRA
+layer selection is generic over any model exposing `model.layers`; llama.cpp's converter registers
+`Phi3ForCausalLM`; community Q4_K_M GGUFs exist. **Still not confirmed** (needs your machine):
 
-- `mlx_lm.lora` training on Phi-4-mini-instruct: community GGUF builds exist for llama.cpp, and a
-  third-party MLX LoRA adapter for `mlx-community/Phi-4-mini-instruct-4bit` exists, but neither
-  proves *training* works in the installed `mlx_lm`. Stage 0 step 0 must run a 20-step
-  `mlx_lm.lora` smoke test and a GGUF convert-and-load round trip before anything depends on it.
+- `mlx_lm.lora` actually training Phi-4-mini-instruct in the installed `mlx_lm` version. Stage 0
+  step 0 must run a 20-step `mlx_lm.lora` smoke test and a GGUF convert-and-load round trip
+  before anything depends on it.
 - Whether the existing fuse → GGUF → Cloud Run path used for Phi-3.5 works unchanged (200k vocab
   and tied embeddings change file size and conversion behaviour).
 
@@ -278,26 +299,113 @@ Llama-3.2-1B differed. Consequently:
 
 - **Llama-3.2-1B and Qwen-class ~1B models do not qualify.** They are the same dense decoder
   design; use only as a labelled **size-only control**, if at all.
-- **Gemma-3-1B still qualifies** (interleaved local sliding-window / global attention is a
-  structural difference; Phi-4-mini's `sliding_window` entry is effectively inactive at 262,144
-  vs 128K context, so it is not a sliding-window model in practice — verify in Stage 0).
-- **LFM2-1.2B-class still qualifies** (hybrid gated short-convolution + attention blocks).
+- **LFM2-1.2B qualifies and is the chosen D (D12).** `Lfm2ForCausalLM`: 16 layers, of which 10 are
+  gated short-convolution blocks and 6 are attention; 32 heads / 8 KV heads; vocab 65,536. Not a
+  pure transformer, so the structural difference from Phi-4-mini is large.
+- **Gemma-3-1B-it is the fallback** (interleaved local sliding-window / global attention, 26
+  layers, 4 heads / 1 KV head, vocab 262,144). Its repo is gated and its config was read from an
+  ungated mirror; re-check against the official repo if it is ever used. Phi-4-mini's
+  `sliding_window` entry is effectively inactive at 262,144 vs 128K context, so Phi-4-mini is not
+  a sliding-window model in practice.
 - A Mamba/SSM ~1B model qualifies architecturally; GGUF/MLX support must be confirmed.
 
-Unverified, to check in Stage 0 before D is included: Gemma-3 and LFM2 `config.json`, `mlx_lm`
-LoRA support for each, llama.cpp/GGUF support for each, and licences (Gemma and LFM2 carry
-custom licences — confirm before publishing any derived weights). If none passes, drop D rather
-than substitute a same-architecture model under another name.
+Verified from upstream source this session: LFM2 `config.json` and card (1,170,340,608
+parameters; LFM Open License v1.0), `mlx_lm` has `lfm2.py`, and llama.cpp's converter registers
+`Lfm2ForCausalLM`. Still to check in Stage 0: a LoRA smoke test and a GGUF round trip for
+LFM2-1.2B, and the **licence terms** (the card names the licence but this session did not read its
+terms; confirm before publishing any derived weights). Note the LFM2 card points to a newer
+LFM2.5-1.2B-Instruct; LFM2-1.2B is kept because its config and tooling are the ones checked here.
+If the smoke test fails, fall back to Gemma-3-1B-it; if that fails too, drop D rather than
+substitute a same-architecture model under another name.
 
-### 3.4 Tooling caveats for BERT/BART (unchanged, still to verify)
+### 3.4 Tooling for BART / DistilBERT
 
-- `mlx_lm.lora` targets decoder LLMs → train A and C with HF Transformers (+ PEFT, or full
-  fine-tuning; at this size full FT is feasible — run LoRA as primary if LoRA is required, full FT
-  as an ablation).
-- llama.cpp's BERT support targets embeddings, not classification heads; BART may be unsupported.
-  If so, A and C serve via ONNX Runtime int8 (or CTranslate2 for BART). Runtime becomes a
-  confound: report each model on its best supported runtime *and* any pair sharing a runtime;
-  don't claim an architecture effect that is really a runtime effect.
+Checked upstream this session:
+
+- `mlx_lm` has **no** BART, BERT or DistilBERT model files, so `mlx_lm.lora` cannot train A or C.
+  Train them with HF Transformers (+ PEFT, or full fine-tuning; at 66M–139M parameters full FT is
+  feasible — run LoRA as primary if LoRA is required, full FT as an ablation).
+- **Fine-tuning BERT-family models on macOS works.** PyTorch's MPS backend (Apple GPU) or plain
+  CPU both run HF Transformers training; models this small fit comfortably in unified memory.
+  Practical notes (general knowledge, to be confirmed by a smoke test, not checked here): set
+  `PYTORCH_ENABLE_MPS_FALLBACK=1` in case an op lacks an MPS kernel; avoid `bitsandbytes`
+  (not available on macOS); prefer fp32 or bf16 over fp16 on MPS if loss goes NaN. Training time
+  from MPS/CPU is **not** comparable with MLX decoder training — already a stated caveat in §6.
+- **llama.cpp**: the converter has no BART module (only the T5 family for encoder-decoder), so A
+  cannot use GGUF. It registers `BertModel` / `DistilBertModel` and their `…ForSequenceClassification`
+  variants with a single set of output labels — aimed at single-head classification/reranking, so
+  our three-head design does not map onto it.
+- Serving therefore: **A** on CTranslate2 (BART is on its supported list) or ONNX Runtime; **C**
+  on ONNX Runtime int8 via Optimum (documented for DistilBERT). ONNX export of BART is untested
+  here. Runtime becomes a confound: report each model on its best supported runtime *and* any pair
+  sharing a runtime; don't claim an architecture effect that is really a runtime effect.
+
+### 3.4a Tooling matrix — final model list, fine-tuning on macOS (D14)
+
+"Checked" = read in upstream source or the model card this session (GitHub / Hugging Face), not
+tried on the target machine. Footprints are **arithmetic from parameter counts, not measurements**;
+Stage 0 step 0 measures them.
+
+| Model | Fine-tune on the MacBook | Precision / rough footprint on 16 GB | Export → serving format | CPU serving runtime (x86, Stage 3) | Mac-specific risks |
+|---|---|---|---|---|---|
+| **B0** `microsoft/Phi-4-mini-instruct` (3.8B) | `mlx_lm lora` on the Metal GPU. `phi3.py` checked (LongRoPE, partial rotary, tied embeddings). Smoke test needed | bf16 weights ≈ 7.6 GB, so LoRA is tight and needs `--grad-checkpoint` and a small batch; or QLoRA on a 4-bit base (≈ 2.0–2.5 GB). One choice for all decoders (§3.4b) | adapter → `mlx_lm fuse` (dequantise if QLoRA) → HF → `convert_hf_to_gguf.py` (`Phi3ForCausalLM` registered, checked) → `llama-quantize` Q4_K_M | llama.cpp / `llama-cpp-python`, GGUF | **200k-vocab logits memory** (§3.4b); Metal OOM mid-training after a clean validation pass; fused bf16 export is ≈ 7.6 GB + scratch disk |
+| **D** `LiquidAI/LFM2-1.2B` (1.17B) | `mlx_lm lora`. `lfm2.py` checked. Smoke test needed — confirm which conv/attention linears LoRA touches and what `--num-layers` selects | bf16 ≈ 2.3 GB: comfortable | same pipeline (`Lfm2ForCausalLM` registered, checked) | llama.cpp, GGUF | Newer architecture: check the installed `mlx_lm` / llama.cpp versions include LFM2 |
+| **A** `facebook/bart-base` (≈ 139M) | HF Transformers (+ PEFT or full FT) on PyTorch **MPS**, or CPU. Not supported by `mlx_lm` (no BART file) | fp32 full FT with AdamW ≈ 2–3 GB: comfortable | PyTorch → ONNX (Optimum, export untested here) or CTranslate2 (`ct2-transformers-converter`; BART listed as supported). **No GGUF path** (no BART converter) | ONNX Runtime or CTranslate2 | MPS op gaps (`PYTORCH_ENABLE_MPS_FALLBACK=1`); seq2seq `generate` may be slower on MPS than CPU, so evaluate generation on CPU and record the device |
+| **C** `distilbert/distilbert-base-uncased` (≈ 66M) | HF Transformers (+ PEFT or full FT) on MPS or CPU. Not supported by `mlx_lm` | fp32 full FT ≈ 1 GB: trivial | PyTorch → ONNX (Optimum) → int8 dynamic quantisation. GGUF registers DistilBERT but only a single classification head, not our three | ONNX Runtime int8 | int8 kernels differ by CPU, so a model quantised and benchmarked on the Mac must be re-benchmarked on x86 |
+| *Fallback* `google/gemma-3-1b-it` (≈ 1B) | `mlx_lm lora`; `gemma3_text.py` checked | bf16 ≈ 2 GB weights; 262k-vocab logits are large like B0's | `Gemma3ForCausalLM` registered, checked; `ggml-org` GGUF exists | llama.cpp, GGUF | Gated repo; custom licence |
+| **Stage Z** (no training) Phi-4-mini-instruct, LFM2-1.2B | none | Q4_K_M GGUF ≈ 2.5 GB for Phi-4-mini (community builds) | existing GGUFs or the same pipeline | llama.cpp, GGUF | Few-shot prompts raise memory and latency; record prompt tokens |
+
+### 3.4b Hardware constraint: MacBook Pro, 16 GB (decision D14)
+
+**Constraint.** All fine-tuning, and all development-side testing and benchmarking (Stage 0, Stage Z,
+Stage 2), runs on **one MacBook Pro with 16 GB of unified memory**. GCP x86-64 CPU is used only for
+the Stage 3 serving validation; nothing is trained there (D5). The chip is recorded as a fact
+about the machine: **MacBook Pro, Apple M2 Pro, 16 GB unified memory** (confirmed by the
+owner; matches `system_profiler` on this laptop). The paper names the exact chip because core
+counts and memory bandwidth differ from the base M2; record core counts and macOS version in the
+environment fingerprint.
+
+**Consequences, and what the plan does about each**
+
+1. **16 GB is shared by macOS, other apps, CPU and GPU.** Metal caps the GPU working set at a
+   fraction of RAM (roughly two-thirds to three-quarters; read the real figure from MLX device
+   info at Stage 0 step 0 rather than assuming it). Training runs with the machine otherwise
+   idle: no browsers, no dev servers, no second model held in memory. The repo's own earlier
+   gotcha applies: a stray process memory-mapping a GGUF causes Metal OOM; check with `lsof`
+   before blaming the dataset.
+2. **Large-vocabulary decoders cost more than their parameter count suggests.** Fp32 logits
+   for a batch cost batch × sequence × vocab × 4 bytes: at batch 4 × 512 tokens that is ≈ 1.6 GB
+   for Phi-4-mini's 200,064-token vocabulary versus ≈ 0.26 GB for Phi-3.5's ~32k. The previous
+   Phi-3.5 recipe (`--batch-size 4 --num-layers 16`, in `docs/BUILD_PLAN.md`) is therefore **not**
+   safe to reuse unchanged; start from `--grad-checkpoint` with a physical batch of 1–2 and
+   gradient accumulation to the same effective batch. Arithmetic only — measure it.
+3. **Precision choice is a confound, so choose it once.** LoRA on a bf16 base vs QLoRA on a 4-bit
+   base changes both memory and the model. Pick one for B0 and D from the smoke test (preferring
+   bf16 LoRA if it fits, because it matches the previous pipeline), apply it to both decoders, and
+   state it. If B0 only fits with QLoRA, use QLoRA for D too even though D would fit in bf16.
+4. **Measure memory correctly on unified memory.** RSS under-counts GPU allocations. Record the
+   framework's own peak (MLX peak-memory API; PyTorch `torch.mps` allocated-memory counters — the
+   exact function names differ by version, verify at Stage 0), plus system swap before and after
+   each run (`sysctl vm.swapusage`). **A run that swaps is invalid for timing and is repeated.**
+5. **One training job at a time.** The older docs allow two LoRA runs side by side; this plan does
+   not, because concurrency distorts both timing and peak memory.
+6. **Thermals and power.** A MacBook throttles under sustained load. Always plugged in, same power
+   mode, lid open, cooldown between runs, thermal state noted. Interleave candidates across the
+   session (do not run all of B0's seeds first and then all of C's) so drift does not align with
+   one model. Re-run one reference job at the start and end of each session to detect drift.
+7. **Budget is set from a measurement.** B0 and D dominate cost: 3 seeds × up to 6 configurations
+   each. After the Stage 0 smoke test measures seconds per step for B0 at the chosen precision,
+   fix the equal tuning budget (§6) so B0's whole budget fits the available time. If it does not,
+   the number of configurations is reduced for **every** candidate, not just B0.
+8. **Mac CPU numbers are arm64 CPU numbers.** CPU-only benchmark rows on the Mac (llama.cpp with
+   `n_gpu_layers=0`, ONNX Runtime CPU) measure Apple performance cores, and macOS cannot pin
+   threads, so latency noise is higher than on Linux. They are a relative signal; absolute
+   latency and the 2× gate are confirmed on x86 in Stage 3. Export formats must therefore be ones
+   x86 can run (GGUF, ONNX, CTranslate2 — all are).
+9. **Disk.** The fuse → HF → GGUF → quantise path for a 3.8B model holds several full-precision
+   copies at once (≈ 7.6 GB each); keep tens of GB free and delete intermediates after each run.
+10. **Environment fingerprint** gains: exact chip and core count, macOS version, RAM, power mode,
+    `mlx` / `mlx_lm` / PyTorch / `transformers` / `peft` / `llama.cpp` versions and commit.
 
 ### 3.5 Controls (cheap, strengthen the paper)
 
@@ -335,7 +443,7 @@ Everything in the previous plan's Stage 1 is re-derived for this task:
      small numbers → compared with exact paired tests, so the ≥ 40 rows per costly cell matter more
      than the total.
    - **Authoring (D2 carried over)**: machine-drafted, then human-verified/corrected. Drafts come
-     from a generator that is **not** a candidate being evaluated *and not the R-frontier model*
+     from **Claude Sonnet 5.5 (`claude-sonnet-5-5`)** (D2), which is **not** an evaluated model in any arm. It is the same vendor family as R-frontier (Claude Opus 5.5), so this is an accepted, documented risk handled by the mitigations in §5.1
      (see §5 circularity warning); committed prompt; per-row `generator`, `prompt_version`,
      date. **Every test row is independently labelled by two annotators (A1, A2; IDs only; D10)**
      on `classification`, `urgency` and `resolution`, each recording `human_action` ∈ {accepted,
@@ -346,6 +454,19 @@ Everything in the previous plan's Stage 1 is re-derived for this task:
      Cohen's κ for `classification` and `resolution`, QWK for `urgency`, each with bootstrap CI —
      is the **unanchored ceiling** models are compared against. Agreement on the non-blind rows
      is reported but flagged as inflated by anchoring. Also report blind-vs-draft agreement.
+   - **Manual correction of the drafted set (explicit risk control, D2).** Human review covers the
+     whole row, not just the labels: (i) the query text — realistic, unambiguous under the written
+     rules, no drafter stylistic tells; (ii) the gold clause IDs and distractors — the clause really
+     does or does not answer the question; (iii) all three gold labels; (iv) the reference summary
+     — consistent with the clause, no invented figures. Every correction is logged (row, field,
+     before, after, reason, annotator). Rows that cannot be fixed are rejected into the audit file.
+   - **Human-written slice.** At least 20% of test rows are written from scratch by the
+     annotators with no model draft, covering the same class × urgency cells. All metrics are
+     also reported on this drafter-free slice, so any drafter effect (including Sonnet–Opus
+     family agreement, §5.1) can be seen directly.
+   - **Rubber-stamp guard.** Report each annotator's accept/edit/reject rate by field. An
+     accept-everything rate above a pre-declared threshold (set after the pilot) triggers a
+     re-review of that annotator's accepted rows by the other annotator.
    - Frozen by SHA-256; never used for tuning or checkpoint selection; evaluated once per final
      configuration.
 5. **Leakage tests (pytest, CI)**: no test query/full message in train/valid; max token-Jaccard
@@ -368,7 +489,7 @@ Everything in the previous plan's Stage 1 is re-derived for this task:
 ### Stage 0 — resources only (untrained weights are a valid probe)
 
 Memory and latency depend on architecture, size, quantisation and sequence length, not on trained
-weights. Run the benchmark on B0, A, C, C′, D, R-big with identical settings (CPU, 4 threads,
+weights. Run the benchmark on B0, A, C, D with identical settings (CPU, 4 threads,
 N=100, real validation-split prompts, same `max_new_tokens`), 3 repeats of the whole process.
 Generative candidates get ~20–50 LoRA steps first so they emit the four-line format and
 realistic token counts.
@@ -387,8 +508,7 @@ what fine-tuning buys, and gives the paper an honest "no training" row.
 
 **Design.**
 
-- Models: Phi-4-mini-instruct and D's instruct model (and optionally one larger open instruct
-  model as a reference, on Apple Silicon only). "Untrained" here means *no task fine-tuning*; it
+- Models: Phi-4-mini-instruct and D's instruct model . "Untrained" here means *no task fine-tuning*; it
   must be the **instruct** variant, since pretrained-only base models do not follow the four-line
   format and would fail on format, which says nothing about capability. A pretrained-only row may
   be added as an appendix to show that.
@@ -401,13 +521,56 @@ what fine-tuning buys, and gives the paper an honest "no training" row.
 - **Resource rows are not comparable to fine-tuned rows** without care: few-shot prompts are much
   longer, which raises latency and memory. Record mean prompt tokens, and report resources for
   untrained models separately and at their actual prompt length.
-- **R-frontier (quality ceiling)** receives the identical rendered input (§1.3). It is reported as
-  a reference, never gated or compared on resources. **Circularity warning:** if the same model
-  drafted the test set (§4 item 4), it will be flattered; draft with one model/vendor and
-  evaluate with another, or label the row as contaminated.
+- **R-frontier** (Claude Opus 5.5) is a separate reference arm: see §5.1.
 - Encoders (BERT/DistilBERT) have no untrained quality mode — skip.
 
 Untrained rows enter Gate 1 against B0 like any fine-tuned candidate.
+
+### 5.1 Frontier reference — Claude Opus 5.5 (decision D15)
+
+**Purpose.** A quality reference that answers "what does a frontier model do on this task with
+nothing but the prompt?", and a cost/latency/privacy comparison that frames the case for running a
+small model locally at all. It is **a reference, not a candidate**: never gated, never recommended,
+no memory metric.
+
+**Protocol (identical inputs, bounded freedom)**
+
+- Model: `claude-opus-5-5`, exact ID string, access date and API/SDK version recorded in every row
+  (a hosted model can change under the same alias; if a dated snapshot ID is offered, use it).
+- Input: the **identical rendered input** (§1.3) and the **same frozen prompts and few-shot
+  examples** as the Stage Z open models: zero-shot, k = 3, k = 8. Same bounded number of prompt
+  variants, selected on valid, never test.
+- Decoding: temperature 0 where the API allows it, otherwise the documented default, recorded.
+  Hosted models are not guaranteed deterministic, so run the test set **3 times** per mode and
+  report run-to-run disagreement (that is the reference's own noise); the headline row uses the
+  majority-voted or first-run prediction as pre-declared before running.
+- Output: the same four-line contract and the same strict grader. Format failures count.
+- Reported with the same paired statistics versus B0 (bootstrap CI, exact paired tests, safety
+  counts) but **labelled descriptive**: the point is the size of the gap, not a verdict.
+- **Cost and latency**: record input/output tokens per request and the list-price cost per 1,000
+  requests at the access date; end-to-end latency p50/p95 *including network*, reported on its own
+  axis and never merged with the local CPU latencies. Compare against the cost of running the
+  small model (instance-hours at the measured throughput) as a break-even volume, with the
+  assumptions stated.
+- **Privacy and data**: the data is fully synthetic, so sending it to an external API is
+  acceptable here. This is **not** transferable to real HR data, which is a reason to keep a local
+  model in the first place — state that in the discussion. API keys come from the environment and
+  are never committed.
+- **Independence (accepted risk, D2).** Test rows are drafted by Claude Sonnet 5.5, a sibling of
+  Opus 5.5, so Opus may agree with draft labels more than an unrelated model would. Opus itself
+  must not draft or label any row, and Sonnet is never evaluated. Mitigations, all pre-declared:
+  (a) every row is fully reviewed and corrected by humans, ≥ ⅓ are labelled blind, and ≥ 20% of rows are human-written with no draft (§4 item 4); results are also reported on that drafter-free slice; (b) report Opus's
+  accuracy **separately on rows the humans accepted unchanged, rows they edited, and the blind
+  subset** — a large gap in Opus's favour on accepted rows is the signature of shared drafter
+  bias and is reported as such; (c) interpret the Opus-vs-open-model gap with that diagnostic in
+  hand, and describe it as an upper-bound-with-caveat, never a clean ceiling. Record the Sonnet
+  exact model ID, access date, prompt version and temperature per row. If any train text was
+  drafted by a Claude model, disclose it.
+- **Not used as a judge.** The plan keeps summary prose out of every gate. If an LLM-judged
+  summary comparison is added later it needs a judge from a different vendor than every model
+  being judged, and is secondary.
+- Optional: a cheaper Claude tier could be added as a second reference point on the cost axis;
+  not planned.
 
 ---
 
@@ -555,15 +718,17 @@ Threats to validity:
   and in-distribution behaviour, not fitness for real HR use or any real policy.
 - Policy retrieval is given, not tested; real systems also err in retrieval.
 - Label subjectivity (urgency especially) — κ reported separately per field.
-- Machine-drafted test labels and the R-frontier circularity (§5) if not separated.
+- Machine-drafted test labels; the drafter (Sonnet 5.5) is the same family as the frontier reference (Opus 5.5), so the Opus row may be flattered — diagnosed by the accepted/edited/blind split (§4 item 4, §5.1); the frontier row depends on a hosted model that may change under the same name and is not deterministic.
 - Setup-effort score is subjective and familiarity-dependent; supporting evidence only.
 - Runtime/quantisation confounds across families (§3.4); few-shot prompt-length confound (§5).
 - Test-set size limits resolvable effect sizes.
+- Fine-tune times and dev memory come from one 16 GB laptop (thermals, other load, framework differences); they describe that pipeline, not the architectures in general (§3.4b).
+- One encoder (DistilBERT), one encoder-decoder (BART) and one hybrid (LFM2) each stand for a whole family; no within-family scaling result (D13).
 - Not legal or HR advice; the synthetic policy is invented and says nothing about real entitlements.
 
 Reproducibility package: lockfiles, container digest, dataset and policy-corpus hashes, split file,
 benchmark script, raw rows and per-example predictions, seeds, hardware fingerprint, model-card and
-licence notes (Phi-4-mini: MIT, confirmed; Gemma / LFM2 custom licences: confirm). Repo hygiene per
+licence notes (Phi-4-mini: MIT, confirmed; LFM2: LFM Open License v1.0, terms still to read; Gemma, if used: custom terms; BART / DistilBERT: Apache-2.0 from memory, confirm). Repo hygiene per
 `CLAUDE.md`: no participant names or contact details; no references to the internal validation
 project; confirm base-model licences before releasing weights.
 
@@ -574,15 +739,19 @@ project; confirm base-model licences before releasing weights.
 | # | Decision | Status |
 |---|---|---|
 | D1 | Candidates that cannot generate text | **Decided (generalised):** labels-only contract for encoders; `summary = null` |
-| D2 | Test-set authoring | **Decided:** machine-drafted, human-verified, blind-label anchoring audit; drafter ≠ any evaluated model (≠ R-frontier) |
+| D2 | Test-set authoring | **Decided:** machine-drafted, human-verified, blind-label anchoring audit; drafter = Claude Sonnet 5.5, never an evaluated model; same-family-as-R-frontier bias documented and diagnosed (§5.1) |
 | D3 | 5-point margin and 2× gate | **Carried over as proposal; re-argue for this task and freeze in `gates.yaml`** (see D3′) |
 | D3′ | Urgency margin | **Decided (this revision):** QWK endpoint; δ_u from the human–human QWK CI on the blind pilot subset (§7); ceiling always shown. Numeric value frozen in `gates.yaml` after the pilot |
-| D4 | Optional ~1B decoder must differ structurally from baseline | **Decided; re-checked** against Phi-4-mini (§3.3): Llama-3.2/Qwen ~1B no longer qualify |
+| D4 | ~1B decoder must differ structurally from baseline | **Decided; re-checked** against Phi-4-mini (§3.3): Llama-3.2/Qwen ~1B no longer qualify |
 | D5 | Environments | **Decided:** Apple Silicon (dev + fine-tuning timing), then GCP x86-64 CPU (Stage 3) |
-| D6 | Baseline | **Decided:** Phi-4-mini-instruct, newly fine-tuned; Phi-4 14B reference-only. Revisit if the target moves off 4 vCPU CPU |
+| D6 | Baseline | **Decided:** Phi-4-mini-instruct, newly fine-tuned; Phi-4 14B not run (D13). Revisit if the target moves off 4 vCPU CPU |
 | D7 | Policy handling | **Decided:** policy text in the input for all models (option 1); retrieval given |
 | D8 | `next_step` design | **Decided (this revision):** model emits `resolution` ∈ {answer_from_policy, escalate_to_human, ask_clarification}; destination queue derived in code from `classification` (§1.1). Avoids a redundant label that would double-count class errors |
 | D9 | Untrained models | **Decided:** include Stage Z with instruct variants, zero/few-shot, plus a frontier reference |
+| D15 | Frontier reference | **Decided (this revision):** Claude Opus 5.5 (`claude-opus-5-5`), zero- and few-shot with the same frozen prompts and rendered input as Stage Z, 3 repeats, reference-only (not gated), cost and latency on a separate axis (§5.1) |
+| D14 | Hardware constraint | **Decided:** all fine-tuning and dev-side benchmarking on one MacBook Pro, 16 GB unified memory (Apple M2 Pro, confirmed); GCP x86 CPU for Stage 3 serving validation only. Consequences in §3.4b |
+| D12 | Candidate D | **Decided:** `LiquidAI/LFM2-1.2B` (hybrid conv + attention); `google/gemma-3-1b-it` is the fallback. Subject to the Stage 0 LoRA/GGUF smoke test and a read of the licence terms |
+| D13 | Dropped models | **Decided:** `google-bert/bert-base-uncased` (C′) and `microsoft/phi-4` (R-big) are removed; encoder family = DistilBERT only |
 | D10 | Test annotation | **Decided (this revision):** two independent annotators on every test row, logged adjudication; ≥ ⅓ blind subset labelled by both gives the unanchored human–human ceiling (§4 item 4) |
 | D11 | Endpoints | **Decided (this revision):** primary family = format, classification accuracy, two safety counts, grounding, resource gate; secondary = urgency QWK, `resolution` accuracy; joint pass rate descriptive only (§6, §7) |
 
@@ -592,15 +761,17 @@ project; confirm base-model licences before releasing weights.
 
 **Verify first (Stage 0, step 0)** — none of this has been checked in this repo yet
 - [ ] `mlx_lm.lora` 20-step smoke test on Phi-4-mini-instruct; GGUF convert → Q4_K_M → load round trip; confirm existing Cloud Build/Docker path still works with the 200k vocab
-- [ ] Confirm `config.json`, `mlx_lm` LoRA and llama.cpp/GGUF support for Gemma-3-1B-it and LFM2-1.2B; licences
-- [ ] Confirm BART / BERT support in `mlx_lm` LoRA and llama.cpp GGUF; choose serving runtimes (ONNX int8 / CTranslate2)
+- [ ] Record core counts (CPU/GPU), RAM and macOS version for the M2 Pro; read the Metal working-set limit from MLX device info; verify the peak-memory API names for the installed `mlx` and PyTorch
+- [ ] B0 smoke test: bf16 LoRA with `--grad-checkpoint`, batch 1–2 — does it fit? Measure s/step, peak memory, swap; fall back to QLoRA if not; fix one precision for B0 and D
+- [ ] LFM2-1.2B: 20-step `mlx_lm.lora` smoke test, GGUF round trip, read the LFM Open License v1.0 terms (fallback Gemma-3-1B-it: same checks)
+- [ ] Smoke-test DistilBERT and BART fine-tuning on macOS (MPS and CPU); test ONNX export of BART and CTranslate2 conversion; choose serving runtimes (ONNX int8 / CTranslate2)
 
 **Stage 1**
-- [ ] Write the label rules: precedence, `other_unclear`, urgency calibration, class→route table (`routing_table.yaml`), `resolution` gold rule
+- [ ] Write the label rules: precedence, `other_unclear`, urgency calibration, class→route table (`routing_table.json`), `resolution` gold rule
 - [ ] Author the policy corpus (clause IDs, SHA-256) and `hr_query_examples.csv`
 - [ ] Canonical render function; generator script with round-trip validation
 - [ ] Persist stable stratified split
-- [ ] Draft test rows with a non-candidate, non-R-frontier generator; human verify; two annotators on every row; adjudication log; blind ≥ ⅓ subset labelled by both; κ / QWK with CIs per field
+- [ ] Draft test rows with Claude Sonnet 5.5 (committed prompt; record ID/date/version per row); keep it out of every evaluated arm; hand-write ≥ 20% of rows with no draft; log every correction; compute per-annotator accept/edit/reject rates; human verify; two annotators on every row; adjudication log; blind ≥ ⅓ subset labelled by both; κ / QWK with CIs per field
 - [ ] Held-out-clause and abstention slices; freeze test (SHA-256); ≥ 150 rows, target set from pilot disagreement rate
 - [ ] Leakage tests in CI (incl. clause-ID holdout)
 - [ ] Strict grader incl. grounding check + contract tests
@@ -609,9 +780,9 @@ project; confirm base-model licences before releasing weights.
 - [ ] Pilot annotation → compute human–human QWK CI → fix δ_u; commit `gates.yaml` **before** any Stage 2 run
 
 **Stage 0 / Stage Z**
-- [ ] Benchmark B0, A, C, C′, D, R-big (resource only), 3 repeats; apply Gate 0
+- [ ] Benchmark B0, A, C, D (resource only), 3 repeats; apply Gate 0
 - [ ] Freeze prompts; choose few-shot examples from train; run Phi-4-mini-instruct and D zero/few-shot (k = 3, 8) on test
-- [ ] R-frontier reference run with identical rendered input (different model from the drafter)
+- [ ] R-frontier (Claude Opus 5.5): confirm API access and budget; run zero-shot, k = 3, k = 8 on test × 3 repeats with the frozen prompts; record tokens, cost per 1,000 requests and network latency; compute break-even volume vs the local model
 
 **Reduce confounding**
 - [ ] Per-family best recipe and best serving architecture, chosen on valid; equal tuning budget; baseline gets the same protocol
@@ -621,7 +792,7 @@ project; confirm base-model licences before releasing weights.
 - [ ] `setup_rubric.md` before first setup; dated logs; fixed order and time-box; two raters; clean-machine rater for baseline; `setup` block in rows
 
 **Stage 2 / 3 / paper**
-- [ ] Fine-tune A, C (C′, D if included) and re-train B0, 3 seeds each with `train_timer.py`; single test pass per final config
+- [ ] Fine-tune A, C, D and re-train B0, 3 seeds each with `train_timer.py`; single test pass per final config
 - [ ] Gate 1 verdicts (non-inferior / inferior / inconclusive), Holm-corrected
 - [ ] Provision GCP x86-64 CPU (4 vCPU / 16 GiB and the smaller shape); rerun everything; Stage 3 checks
 - [ ] Confirm model and data licences before releasing weights
@@ -632,7 +803,7 @@ project; confirm base-model licences before releasing weights.
 ```
 backend/eval/benchmark_model.py   backend/eval/grader.py     backend/eval/compare_rows.py
 backend/eval/train_timer.py       backend/eval/setup_rubric.md   backend/eval/gates.yaml
-backend/eval/routing_table.yaml  backend/eval/backends/   backend/tests/test_eval_*.py   results/ (rows, predictions, setup_logs/)
+backend/eval/routing_table.json  backend/eval/backends/   backend/tests/test_eval_*.py   results/ (rows, predictions, setup_logs/)
 backend/data/hr_policy_corpus.json   backend/data/hr_query_examples.csv   backend/data/hr_query_splits.json
 backend/data/hr_query_test/test.jsonl   backend/data/hr_query_test.csv
 backend/scripts/generate_hr_query_dataset.py   backend/scripts/train_hf_candidate.py

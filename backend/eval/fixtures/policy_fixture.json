@@ -1,0 +1,17 @@
+{
+  "_note": "FIXTURE policy corpus: invented, for harness tests only. Not the benchmark policy corpus.",
+  "clauses": {
+    "L1": "Full-time employees accrue 20 days of annual leave per year. Leave requests should be submitted at least 14 days before the start date.",
+    "L2": "Employees may take up to 10 days of paid sick leave per year. A medical certificate is required for absences of more than 3 consecutive days.",
+    "L3": "Eligible employees may take up to 26 weeks of paid parental leave.",
+    "S1": "Employees with 10 or more years of service accrue 25 days of annual leave per year.",
+    "C1": "Complaints about workplace conduct can be raised with Employee Relations. The complaint will be acknowledged within 2 working days.",
+    "C2": "Formal complaints are investigated by someone independent of the team involved. Complainants may bring a support person to any meeting.",
+    "H1": "Any hazard that could cause injury must be reported to Health and Safety immediately. Report serious hazards by phone, then submit a written hazard report within 24 hours.",
+    "H2": "Near misses should be reported within 5 working days using the hazard report form.",
+    "R1": "A hiring request must be approved by the department head and submitted to Recruitment with a position description. Recruitment will respond within 5 working days.",
+    "R2": "Fixed-term roles of more than 12 months require finance approval before advertising.",
+    "G1": "Employees may request flexible working arrangements after 6 months of service.",
+    "G2": "The HR service desk is open Monday to Friday, 8:30 to 5:00."
+  }
+}

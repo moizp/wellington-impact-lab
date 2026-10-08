@@ -55,16 +55,17 @@ policy-grounded query routing on CPU*
 - Training/validation CSV, stable stratified split
 - Test set: newly authored, machine-drafted then human-verified; held-out-clause and abstention slices
 - Annotation: two annotators on every row, adjudication log, blind subset for unanchored ceiling
+- Manual correction of drafted rows (full-row review, correction log) and a ≥ 20% human-written, drafter-free slice
 - Agreement statistics (κ / QWK with CIs); size and power reasoning
 - Leakage tests; frozen by hash
 
 ## 5. Candidates and controls
 
 - Baseline: Phi-4-mini-instruct, newly fine-tuned, Q4_K_M
-- Smaller fine-tuned: bart-base (full contract); distilbert (+ bert-base ablation), labels-only
-- Optional ~1B decoder, architecturally different from the baseline (Gemma-3-1B / LFM2)
-- Untrained arm: instruct models, zero- and few-shot; frontier reference (quality ceiling only)
-- Reference: Phi-4 14B (resource/scale argument, not a candidate)
+- Smaller fine-tuned: bart-base (full contract); distilbert-base-uncased, labels-only
+- ~1B hybrid decoder, architecturally different from the baseline: LFM2-1.2B (fallback Gemma-3-1B-it)
+- Untrained arm: instruct models, zero- and few-shot
+- Frontier reference: Claude Opus 5.5, same prompts and inputs; quality gap, cost per 1,000 requests, network latency, break-even volume; privacy argument for local models
 - Controls: majority, keyword, TF-IDF + LR, class-only rules, summary-copy, quantisation ablation
 
 ## 6. Methodology
@@ -101,10 +102,11 @@ policy-grounded query routing on CPU*
 - 7.3 Safety analysis: critical misroutes, under-urgency
 - 7.4 Grounding and abstention behaviour
 - 7.5 Untrained vs fine-tuned: what fine-tuning buys; few-shot cost in latency
+- 7.5a Frontier reference: gap to the baseline, run-to-run noise of a hosted model, cost and break-even analysis
 - 7.6 Pareto plot: pass rate vs p95 latency vs peak memory
 - 7.7 Fine-tune cost and setup-effort ratings
 - 7.8 Dev (Apple Silicon) vs production-like (x86 CPU) validation and drift
-- 7.9 Ablations: quantisation, runtime, encoder capacity, robustness perturbations
+- 7.9 Ablations: quantisation, runtime, robustness perturbations
 
 ## 8. Discussion
 
@@ -118,7 +120,7 @@ policy-grounded query routing on CPU*
 - Synthetic, small, single-team data; stand-in task; in-distribution only
 - Retrieval given, not tested
 - Subjective urgency labels; ceiling set by annotator agreement
-- Machine-drafted labels and anchoring; drafter-vs-evaluated-model separation
+- Machine-drafted labels (Sonnet 5.5) and anchoring; same-family bias toward the Opus reference, diagnosed by accepted/edited/blind split
 - Subjective, familiarity-dependent setup ratings
 - Runtime and prompt-length confounds; test-set size limits
 - Not HR or legal advice; invented policy
