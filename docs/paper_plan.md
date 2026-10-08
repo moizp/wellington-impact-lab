@@ -208,7 +208,7 @@ rows, not eyeballing logs.
 | **A** | `bart-base` (optionally `distilbart` variant) | ~140M | encoder-decoder | **full** (generates both lines) | HF Transformers (+PEFT LoRA) |
 | **C** | `distilbert-base-uncased` | ~66M | encoder + class head | severity only | HF Transformers (+PEFT LoRA or full FT) |
 | **C′** | `bert-base-uncased` | ~110M | encoder + class head | severity only | capacity ablation of C (Stage 0 + one run) |
-| **D** (optional, conditional) | a ~1B decoder **whose architecture differs materially from Phi-3.5** (see below) | ~1B | decoder | full | **MLX LoRA → GGUF — identical pipeline to baseline** |
+| **D** (optional, conditional) | **Gemma-3-1B-it** (fallback: LFM2-1.2B) — see "Final selection" | ~1B | decoder | full | **MLX LoRA → GGUF — identical pipeline to baseline** |
 
 Recommendation: **finalists A and C** (answers the stated BART/BERT question; A is the only
 small model covering the full contract). Add **D** only if it passes the architecture-difference
@@ -233,6 +233,40 @@ check against each model's `config.json` and the installed `mlx_lm` / `llama.cpp
 | LFM2-1.2B-class | hybrid gated short-convolution + attention blocks (not a pure transformer) |
 | A Mamba/SSM ~1B model | no attention — state-space recurrence (GGUF support must be confirmed) |
 | Llama-3.2-1B / Qwen-class ~1B | fallback only: same dense design; usable as a *size-only* control, labelled as such |
+
+### Final selection (decided)
+
+| Slot | Model | Role |
+|---|---|---|
+| B0 | Phi-3.5-mini-instruct, LoRA, Q4_K_M GGUF | Baseline (deployed) |
+| **A** | `facebook/bart-base` | **Finalist** — only small candidate covering the full two-line contract (encoder-decoder, ~140M) |
+| **C** | `distilbert-base-uncased` | **Finalist** — severity-only (D1), ~66M, the cheapest end of the range |
+| C′ | `bert-base-uncased` | **Not a finalist.** Stage 0 resource probe plus one capacity ablation against C (is the distillation cost visible?) |
+| **D** | `google/gemma-3-1b-it` | **Optional third finalist.** Chosen because its attention is structurally different from Phi-3.5 (interleaved local sliding-window / global layers, GQA, very large vocabulary) while keeping the MLX-LoRA → GGUF pipeline. Gemma ships under its own licence terms — confirm before publishing derived weights |
+| D-fallback | `LiquidAI/LFM2-1.2B` | Used only if Gemma-3-1B fails the check below. Hybrid gated-convolution + attention blocks — the larger architectural departure, but the less certain tooling path |
+
+Dropped: Llama-3.2-1B and Qwen-class ~1B models (same dense design as Phi-3.5 — size-only
+control, not worth a slot); `distilbart` (adds a variant without answering a new question);
+Mamba/SSM (GGUF and MLX LoRA support too uncertain for the schedule).
+
+**Verification status — important.** The selection above is from my knowledge of these models.
+During finalisation I tried to confirm the architecture configs from Hugging Face but the
+planning environment's network proxy blocked `huggingface.co`, and a web search could not confirm
+`mlx_lm` LoRA support for Gemma-3 or LFM2, or any llama.cpp support for BART / BERT
+classification heads (it did confirm BERT is documented in llama.cpp, i.e. embedding-oriented).
+So the selection is **conditional on a Stage 0 "step 0" check**, to be run on a machine with
+access, with pass/fail recorded in the repo before anything is trained:
+
+1. `config.json` of each model confirms the claimed structural differences from Phi-3.5.
+2. `mlx_lm` (installed version) has the architecture under `mlx_lm/models/` and
+   `mlx_lm.lora` runs ≥ 10 steps on it.
+3. `llama.cpp` `convert_hf_to_gguf.py` converts the fused model and `llama-cpp-python` generates
+   from it (for D). For A and C, record which runtime actually works (ONNX Runtime / CTranslate2
+   / PyTorch) — GGUF is *not* assumed.
+4. Licence terms permit the intended publication.
+
+Gemma-3-1B failing 2 or 3 → switch to LFM2-1.2B and rerun the check; both failing → drop D (do not
+substitute a same-architecture model).
 
 If none passes the support check, drop D rather than substitute a same-architecture model under a
 different name. Check licences before publishing derived weights (several of these carry custom
@@ -506,7 +540,8 @@ licences before releasing fine-tuned weights.
 | D1 | Severity-only candidates (no rationale) | **Decided: acceptable** — severity is the main output. Encoder candidates are scored on the severity-only contract; the paper states the contract delta. Still to settle in implementation: `rationale` = `null` vs. a deterministic template (default `null`; the dashboard already hides a missing rationale) |
 | D2 | Test-set authoring | **Decided:** machine-drafted candidate rows, human-verified/corrected (protocol in §3 item 3) |
 | D3 | Accuracy tolerance and resource gate | **Decided:** 5-point non-inferiority margin; 2× gate (explained in §9) |
-| D4 | Candidate D (~1B decoder) | **Decided: optional, conditional** on being architecturally different from Phi-3.5 (§2) |
+| D4 | Candidate D (~1B decoder) | **Decided:** Gemma-3-1B-it, optional, conditional on the Stage 0 step-0 check; LFM2-1.2B fallback (§2 "Final selection") |
+| D6 | Final model set | **Decided:** B0 baseline; finalists A (`bart-base`) and C (`distilbert-base-uncased`); C′ (`bert-base-uncased`) as ablation only; D optional |
 | D5 | Environments | **Decided:** every candidate (and the baseline) runs on **Apple Silicon** (dev) and then on **GCP x86-64 CPU** (production-like, Stage 3). Note Apple Silicon is macOS (Darwin/arm64), not Linux — it is a dev proxy for Linux-style tooling, not the same OS or ISA as Cloud Run, which is exactly why Stage 3 exists. Fine-tuning and its timing happen on Apple Silicon only (see §5) |
 
 ## 9. Todos
@@ -546,6 +581,7 @@ Checklist (tick as done):
 - [ ] Commit `gates.yaml` with the 5-point margin and 2× gate **before** any Stage 2 run
 
 **Stage 0 — screening**
+- [ ] Step 0 (blocking): run the 4-point model-selection check in §2 "Final selection" for A, C, C′, D (and the LFM2 fallback if needed) on a machine with Hugging Face access; commit the pass/fail results
 - [ ] Verify tooling caveats (§2): BERT/BART support in `mlx_lm` LoRA and in llama.cpp GGUF; pick serving runtimes
 - [ ] Benchmark B0, A, C, C′ (and D if it qualifies) on CPU, 3 repeats; apply the 2× gate
 
